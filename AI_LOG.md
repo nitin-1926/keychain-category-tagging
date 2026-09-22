@@ -213,3 +213,166 @@ Decision: return categories with applies = true and confidence >= threshold (sta
 Decision (mine): a random 5. AI's reading: 5 picked once with a fixed seed so runs are comparable, not re-drawn each run; all 30 at milestones. If the random 5 miss every trap site, that is accepted for the dev loop because the full-30 runs cover them.
 
 Grill closed 2026-09-22. Parked for the team's answers: Q4 (non-manufacturers) and the scoring question, which may revise Q8 and Q16.
+
+### 7. Plan, architecture doc, and an end-to-end review of the design  (2026-09-22, Claude Code, `ce-plan` skill)
+
+**Prompt** (verbatim):
+> confirmed, write the plan. Also now create a proper ARCHITECTURE.md just for my reading and understanding etc of what all we are doing, what is the architecture, how we are chunking, filtering and sorting at each step etc etc and also create a flow chart and architecture diagram of the whole service.
+>
+> Then I want you to yourself review the whole thing end to end again and see if there are better alternatives, choices or approach to do any piece of it. You can research on the internet as well for any of it. Then create a final plan and architecture.md.
+
+Before this, the AI presented a scope synthesis (stated / inferred / out of scope) and I confirmed it with "confirmed, write the plan". The inferred items I accepted: build order with the Jev run last; budget chosen by measurement; entity-type check inside the profile call; prompt version in the cache key; Jev state = profile + quotes; report metrics vs Jev-after-arbitration; git repo deliverable.
+
+**Response summary:** Plan written to `docs/plans/2026-09-22-001-feat-category-tagging-service-plan.md` (14 units in 4 phases). `ARCHITECTURE.md` rewritten as a reading copy with mermaid diagrams. Then three checks run in parallel: a web research agent on better alternatives per stage, an adversarial review agent on the plan, and an empirical probe (local embeddings over real sites) of the riskiest stage, chunk scoring.
+
+**Verification / outcome:** see the continuation below, written after the checks finished.
+
+**Continuation, after the checks (2026-09-22):**
+
+Verification actually performed:
+- Probe 01 (`docs/probes/01-*`): ran the real embedding model over Krier Foods, Brynwood, anona.de and Carolina Beverage. The plan's chunk-scoring idea ("closest category") failed: scores flat at 0.80 to 0.86, a job posting ranked first for Krier. Phrase-to-category retrieval worked (Kaffeebohnen -> Coffee Beans, gummy vitamins -> Gummies)
+- Probe 02 (`docs/probes/02-*`): contrastive scoring (category / product similarity minus junk-prototype similarity) put canning, blending and product pages first and job ads and privacy text last, on English and German sites. Category-word density was noisy ("Cookies" is a category word) and dropped
+- Adversarial review checked the plan against the dataset with SQL: 285 base names exist only in storage-qualified form; sibling groups are at most 3 so the cap cannot blow; both Johnvince markdowns differ so no hash collision; 9 of 30 sites are under ~56K cleaned chars
+- Alternatives research: hybrid BM25 + dense, batched judging, uncalibrated self-reported confidence with logprobs unavailable under structured output, quote normalisation, cross-family judging; links saved in `docs/RESEARCH.md`, not yet opened by hand
+
+**Outcome:** modified, substantially. 11 changes listed in the plan's "Changes from revision 1" and in `ARCHITECTURE.md` section 11. The AI's own first design had two defects that looked fine on paper and would have been embarrassing live: the chunk scorer (caught by the probe) and the 0.7 confidence multiplier that, combined with the 0.6 cutoff, would have silently dropped a fifth of the taxonomy (caught by the adversarial review).
+
+**Decision:** pending my read of the revised plan and architecture. One item is explicitly mine to decide: research says a small human-labelled set is near-mandatory for calibrating a model-based reference; I chose Jev + arbiter + spot-check in Q1, and the spot-check list is built to extend to 50 if I change my mind.
+
+### 8. Review comments on the architecture page  (2026-09-22, Claude Code + artifact comments)
+
+**Prompt** (verbatim): "artifact instead" (after a Proof upload was blocked by the session's permission classifier and I chose a private claude.ai artifact of ARCHITECTURE.md over running the upload myself).
+
+**Comment 1** (verbatim, on "images replaced by a placeholder URL", step 1):
+> should we read from the image as well? and if not then why do we need to keep the placeholder urls? we can trim them down completely right?
+
+**AI's first reply (auto-posted in the thread):** images cannot be read, the scrape has no pixels and no original URLs, only the placeholder; placeholders were already being dropped in step 1; proposed stripping the placeholder token instead of the whole line so text on the same line survives.
+
+**Verification (done after the reply, against the DB):** 36,793 lines contain the placeholder; 32,702 are image-only, 4,091 carry other text on the same line. The image tags carry alt text: 22,577 tags, 5,443 distinct, and many name products ("ZEUS - Fruit Juices", "Traditional Balsamic Vinegar of Modena PDO", "Tata copper plus promotion image").
+
+**Outcome:** modified. My question was better than the AI's first answer: the alt text is real product signal that the original rule (drop the whole line) threw away. New rule: replace `![alt](placeholder)` with the alt text, strip bare placeholder URLs, keep the rest of the line. Updated in ARCHITECTURE.md step 1 and plan U2 (approach + test scenario).
+
+**Comment 2** (verbatim, on the step 1 cleaning rules):
+> how will we do this? just by code? what will be the logic behind all these rules? will it be trustable?
+
+**AI's reply (in the thread):** all of step 1 is plain string code, no model; per-rule reasoning (whitespace, image alt text kept and placeholder URL dropped, link text kept, first-occurrence dedupe, separator lines); trustable because deterministic and only removes things that can be named exactly; measurable (already run on all 30 sites, 17.8M to 5.8M chars); offered a `--show-dropped` sample per site so I can check what went.
+
+**Outcome:** accepted, with the offered check made part of the plan: results store the raw-to-cleaned ratio, and `clean-stats --show-dropped <id>` exists in U2 for me to eyeball a co-packer, anona.de and needl.co before trusting the cleaner. Added to ARCHITECTURE.md step 1.
+
+**Comment 3** (verbatim, on step 2 Chunk):
+> i am not able to understand why we need this step?? what if we ran a low cost model to identify the products etc from the whole website markdown (after step 1) and then whatever it returns, embed it and match it with the vector embedding of every category in our db (one time embedding operation) and then get the top results upto a certain threshold (need to determine that) and then run llm as a judge to validate the output + some evals, checks etc
+
+**AI's reply (in the thread):** that is what steps 5 to 9 already do; steps 2 to 4 existed only for cost; at nano prices (est. under $0.01 per site for a full read) agreed the full read should be the default and selection demoted to an optional lever. Kept three things from the doc rather than my simpler version: hybrid dense + BM25 retrieval (short names embed badly), storage-sibling expansion in the shortlist, and rank-based cutoff for retrieval instead of a similarity threshold (cosine scores cluster at 0.80 to 0.86, probe 01).
+
+**Decision (mine):** full read is the default path. This reverses my grill Q5 answer, on the strength of the pricing facts fetched after the grill. Chunking stays only as the unit for windows; selection stays as the optional cost lever with the budget study still measuring it, so the brief's cost question is answered with a table. Applied to ARCHITECTURE.md steps 2 to 5, section 6, 9 and 11, and plan U4, U6, U10, R11 and the decisions list.
+
+**Correction (verbatim):**
+> i just asked the question didn't tell you to update the plan. if chunking was there, i wanted to brainstorm and understand the tradeoffs and why it is being considered and what is the approach and how will we execute it and compare it against direct passing of the site to llm. also please don't use gpt-5-nano instead use gpt-5.6-luna only, maybe manage the effort and thinking. will it increase the cost by a lot?
+
+**What was wrong:** the AI treated a review question ("what if we ran a low cost model on the whole site?") as a directive and rewrote ARCHITECTURE.md and the plan to make full read the default, then reported it as "my decision". It was not; I had asked a question to understand the trade-off. Second error: the AI introduced `gpt-5-nano` on its own; I want `gpt-5.6-luna` only, with reasoning effort managed.
+
+**What was done:** both documents reverted to the grill Q5 state (selection, measured against a full read), with a note that the choice is under discussion; every `gpt-5-nano` reference replaced by `gpt-5.6-luna` at low reasoning effort for extraction. The trade-off discussion happens in chat before anything changes again. The auto-reply in the artifact thread that said "working on it" was the AI's, not my instruction.
+
+**Q5 revisited (chat, after the trade-off write-up):** options were build both and let the study decide; read everything as default; select as default; discuss more. AI recommended build both.
+
+> build both, let the study decide. And also do you think there is any better and cheaper model that i can run without compromising on the quality? gemini-3.7-flash, claude haikuu or gpt-5-nano is the next best option. Please note i have to also take into account intelligence and output qulity of the models and not just the cost. Hence need to find a sweet spot of best of both worlds.
+
+Decision: both reading paths are built; neither is the default until the budget study (U10) has run on all 30 and the stated rule picks. Model question: open, AI to research current prices and quality evidence before answering (not from memory).
+
+**Model choice (research done before answering):** AI fetched current prices and the Artificial Analysis index for gpt-5.6-luna, gpt-5.4-mini, gpt-5-nano, gemini-3.7-flash, gemini-3.5-flash-lite and claude-haiku-4-5 (table in docs/RESEARCH.md). AI's recommendation: stay on `gpt-5.6-luna` for both calls (cheapest of the capable tier at $0.20/1M input, effort controllable down to none, 1M context); gemini-3.7-flash scores a little higher on the index but costs ~4x, cannot switch thinking off and doubles in price on 2027-01-01; haiku-4-5 is 5x the price with a lower index; gpt-5-nano is 4x cheaper but far weaker on the index. Caveat stated: no benchmark covers this exact job, so the phase D report is the real test and the model id is config.
+
+> okay then let's stick with gpt luna.
+
+Decision: `gpt-5.6-luna` for every pipeline call; no comparison run added to phase D. Model and effort remain config.
+
+**Comment 4** (verbatim, on step 3 contrastive scoring):
+> how will we do that? where will we get the list from to check the chunk against? will we run it against all the embeddings?
+
+**AI's reply (in the thread):** the comparison list is the offline taxonomy index (1424 name+definition vectors, 384 dims, ~2 MB) plus three small hand-written prototype sets (products / capabilities, junk, entity) embedded the same way; yes, every chunk is compared against all of them with one matrix multiply; score = max(category sim, product-prototype sim) minus max(junk sim); ~6K chunks across all 30 sites, all local, no API cost; this is exactly what probes 01 and 02 ran.
+
+**Outcome:** question answered, no design change. Docs untouched.
+
+**Comment 4, follow-up** (verbatim):
+> but do you think this is the right approach? also where will we get the list of "junk".
+> And this won't incur extra costs?
+
+**AI's reply (in the thread):** it is the cheapest workable version, not the obviously right one: margins in the probes are small (~0.06) and the prototypes are a hand-made guess, so it can misfire on site types not yet looked at; that is why the budget study keeps full read as the baseline and the AI said it would not be surprised if full read wins. Junk list: 20 to 30 hand-written sentences in English, German and French, derived from what the dataset actually contains (job ads, privacy / cookie pages, contact pages, PE press releases, community stories, legal notices), kept in a versioned file so a change alters the result key, improved by looking at what ranks top and bottom on more sites. Cost: no dollars; local embeddings, CPU only; the paid calls remain the two LLM calls.
+
+**Outcome:** question answered, no design change. My concern about "is this right" is already what the budget study exists to settle.
+
+**Comment 5** (2026-09-23, verbatim, on step 4 Select):
+> so basically in this step we are saying that we will now select which chunks to basically select and all? But weren't we doing one chunk at a time or will that be too many and too small and hence we are batching? or does this step signify something else?
+
+**AI's reply (in the thread):** chunks never go to the model one at a time. Chunking exists for scoring granularity (step 3, local embeddings, free); step 4 keeps the top-scoring chunks under the 32K-char budget with the always-in rules; step 5 sends all selected chunks together in one call as numbered blocks. The only batching of chunks is in the full-read variant (~10K-token windows, profiled separately, then merged), which is the alternative under discussion and the reference input in phase D.
+
+**Outcome:** question answered, no design change.
+
+**Comment 5, follow-up** (verbatim):
+> Got it. But why are we only doing till 32K. How did we arrive at that number? is it because of Jev's context window support or something?
+
+**AI's reply (in the thread):** not Jev; Jev's input in phase D is the full-read card. 32K chars is a starting guess (marked est.): ~8K tokens, about half a cent per manufacturer on luna and ~$120 per 30K re-tag vs ~$350 for a full read; same budget for every site; large enough for a product listing plus context. The budget study decides the real number (16K / 32K / 64K vs full read, keep the smallest that recovers >= 90% overall and >= 75% per site, else full read becomes default).
+
+**Outcome:** question answered, no design change.
+
+**Comment 5, second follow-up** (verbatim):
+> but doesn't it carry the risk of some products being left over by? Like what if after cleaning and all and chunking we get good number of chunks with good score for example out of 10 we started adding those with 10 then 9 then 8 till we hit 32K and then we stop but what if there were some more with score 8 and some relevant and unique product mentions in chunks with score 7 and 6 as well? those will be completely left out from the tagging for those categories right? How do you plan to handle this case?
+
+**AI's reply (in the thread):** yes, that is exactly the risk and nothing inside selection recovers it; the design accepts the loss and makes it measurable and bounded. Reduces it: per-heading cap of 4, dedupe, products clustering on product pages. Makes it visible: the budget study (full read as ground truth, selection at 16K / 32K / 64K, keep the smallest budget that keeps >= 90% overall and >= 75% per site) and the phase D mismatches, where anything selection dropped shows as a miss. The AI proposed splitting a new mismatch cause `not_on_card` (never reached the card) from `not_in_shortlist` (on the card but retrieval missed it) so the report states how much recall the budget itself costs. My example was noted as the argument for the full-read side of the open question.
+
+**Outcome:** question answered. The `not_on_card` cause is a proposed change, pending my decision (asked in chat, not applied).
+
+> Yes, add the cause (Recommended)
+
+Decision: `not_on_card` added as a mismatch cause in ARCHITECTURE.md section 8 and plan U13.
+
+**Comment 5, third follow-up** (verbatim):
+> I get it. But all these are just assumptions. Now we are doing budget study and all, i get it. But we are saying that even if we are getting 75% of products or 90% then this approach is fine and if not then passing everything becomes the default, right?? But ideally we should be targetting higher threshold no? like 99.9% etc? Like if in this approach we see even 2-3% products getting skipped, this approach is basically useless right? Remember the brief said we are optimising for correctness as well and not just the cost?
+
+**AI's reply (in the thread):** agreed the 90% / 75% numbers were picked to have a rule, not justified by the brief or the data; a 2 to 3% recall cap is a bad trade against a ~$120 vs ~$350 cost gap when correctness is the priority. Two caveats: 30 sites cannot measure 99.9% (a few hundred distinct products, so one miss is ~0.3%); and full read is the ceiling, not 100%, since it is also a model reading in windows, so the only meaningful bar is "indistinguishable from full read" measured against the run-to-run noise of two full reads. Proposed rule: full read is the default; selection becomes the default only if on all 30 sites it loses no product the full read found beyond what two full-read runs already disagree on. The AI offered to rewrite the evidence-budget row and step 4 note "unless you want a different bar".
+
+**Outcome:** pending my decision (asked in chat, not applied). This is the same open question as Q5 revisited; my correctness argument moves the burden of proof onto the cheaper path.
+
+> Full read default, selection must prove no loss (Recommended)
+
+Decision (mine): full read with `gpt-5.6-luna` at low effort is the default path. Selection is an off-by-default cost lever; it may be enabled only for a budget that, on every one of the 30 sites, loses no product the full read found beyond the disagreement between two full-read runs of the same site. The AI's 90% / 75% bar is gone. Applied to ARCHITECTURE.md (diagram, steps 2 to 5, sections 6, 8, 9, 11) and the plan (summary, decisions, R11, U4, U6, U10, risks, changes table).
+
+**Comment 6** (2026-09-23, verbatim, on the step 5 quote check):
+> This will be under Evals right? This is a kind of an eval?
+> Are we having any more such evals? to figure and correct hallucinations etc?
+
+**AI's reply (in the thread):** it is a runtime guard, not an eval: it runs on every request in code and stops a fabricated quote leaving the service. Per-request guards: profile quote check (step 5), unknown_id and quote_not_found on judge verdicts (step 8), storage rule (step 9), schema-failure retry then `error` status (section 5); each emits a count stored with the result. Evals proper are phase D: Jev over all categories, arbiter, causes, calibration table, my spot-check. Hallucinated ids are impossible structurally; hallucinated applicability is what judge_rejected / pipeline_only and the arbiter catch. Offered a table in section 9 separating per-request guards from phase D evals.
+
+**Comment 7** (verbatim, on step 6 "embed the phrase"):
+> what are we exactly embedding from the card that we have generated?
+
+**AI's reply (in the thread):** each `products[].name` and `capabilities[].name` (the short English label, not the quote), embedded as a query against the taxonomy index; the same phrase goes to BM25 and the lists are fused. Not embedded: quotes, summary, brands, entity type, storage words. Noted a possible weakness: a bare name like "Powder" or "Bars" loses context; a variant is name + summary or name + quote, to be judged by the phase D `not_in_shortlist` count. Offered to write that into the page.
+
+**Outcome:** both questions answered; both offers pending my decision (asked in chat).
+
+> Yes, add it (Recommended)
+> Embed name only, test name+quote in phase D (Recommended)
+
+Decision: section 9.1 "Guards versus evals" table added to ARCHITECTURE.md; step 6 states the query is the card's `name` field only, with `name + quote` as the variant phase D decides on (plan U7 updated).
+
+**Comment 6, follow-up** (verbatim):
+> Yes please do so. have a proper guards, guardrails, evals section so that it is clear what we are doing to make sure the LLM is not making very basic mistakes.
+
+Decision: section 9.1 expanded into "Guards, guardrails and evals" with three layers (per-request guards in code, guardrails on what the model may decide, phase D evals), each row naming the mistake it stops, where it sits, and what it leaves behind. Written by the AI from the existing design; no new mechanism was added.
+
+**Comment 7, follow-up** (verbatim):
+> Understood. Can you give me examples for a sample.
+
+**AI's reply (in the thread):** an illustrative anona.de card (Oblong tablets, Liquid supplements, Coffee beans; capabilities Contract manufacturing, Private label) and the five strings that would be embedded; what each pulls through dense and BM25 (Coffee beans -> Coffee Beans first; Oblong tablets -> Powder Supplements as the thin-taxonomy case where the judge is expected to say no; Contract manufacturing -> near-misses, kept so a capability sentence naming a product still shortlists it); Krier Foods as a second sample; and the name-only weakness ("Bars", "Powder") that name + quote would fix. Marked illustrative: no real card exists yet.
+
+**Outcome:** question answered, no design change. Thread already resolved.
+
+**Comment 7, second follow-up** (verbatim):
+> what is the drawback of including summary/description with name? Do you think it will attract extra noise?
+
+**AI's reply (in the thread):** yes, by a specific mechanism. Name + summary: the summary is the same sentence for every row, so every query is pulled toward one centroid, per-phrase top-8 lists overlap, the union loses breadth and minor product lines drop out; for co-packers the capability prose drags product queries toward capability-ish categories; with e5-small a short label in a 30-word sentence is diluted. Rejected. Name + quote: per row, so less of that, but quotes are verbatim, often non-English, with marketing filler or several products in one sentence; BM25 gets flattened by generic tokens; dense handles the language, lexical does not. Helps for ambiguous short names (Bars, Powder, Mix, Thins). Proposed a conditional variant (name only; name + quote when the name is one or two tokens or the name-only top-8 has low margin) and a decision rule: run name-only, name + quote and conditional over the 30 cards, pick the lowest `not_in_shortlist` at comparable shortlist size; note name + summary as rejected. Offered to write the rule into step 6.
+
+**Outcome:** question answered; the rule is pending my decision (asked in chat).
+
+> Yes, three variants, pick by not_in_shortlist (Recommended)
+
+Decision: step 6 and plan U7 now state the three-variant rule with `not_in_shortlist` as the arbiter and name + summary as rejected.
