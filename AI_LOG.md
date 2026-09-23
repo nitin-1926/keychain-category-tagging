@@ -376,3 +376,84 @@ Decision: section 9.1 expanded into "Guards, guardrails and evals" with three la
 > Yes, three variants, pick by not_in_shortlist (Recommended)
 
 Decision: step 6 and plan U7 now state the three-variant rule with `not_in_shortlist` as the arbiter and name + summary as rejected.
+
+### 9. Two doubts after the page review: where sol fits, and a retrieval-then-Jev pattern  (2026-09-23, Claude Code)
+
+**Prompt** (verbatim):
+> Overall now it looks better I just had 2 more doubts:
+> 1. Where does gpt-5.6-sol comes into play?
+> 2. [pasted research, summarised: "instead of passing everything directly into Jev", a two-stage pattern: embed the 1,500 options into a vector DB, retrieve the top ~15 per item, send those 15 to Jev (or a local "Laya", or a fine-tuned "Kev") for the multi-label decision; claims Jev cannot reliably evaluate a flat prompt with 1,500 options without context limits, accuracy degradation or high cost.] Maybe use our existing embeddings and retrievals for this? what do you think?
+
+**Response summary:** see chat. Sol is the phase D arbiter only. The pasted pattern is the pipeline we already have (retrieve, then judge), with Jev in the judge seat; Q14 deliberately gives Jev all 1,424 so the reference does not inherit our retrieval's misses. The pasted cost and context claims do not match the TypeSafe docs for independent Noul questions (chunked requests, $0.042 per 1M input). "Top 15 per item" is the wrong shape here because the item is a whole company, not one product. Proposed keeping Q14 and optionally adding Jev-on-our-shortlist as a judge-only comparison.
+
+> Keep Q14 as is (Recommended)
+
+Decision: Jev over all 1,424 stays the phase D reference; no Jev-on-shortlist comparison; sol remains the arbiter only. No document changes.
+
+### 10. Phase A build starts  (2026-09-23, Claude Code)
+
+**Prompt** (verbatim):
+> Let's start with phase A
+
+**Response summary:** phase A is U1 to U4 of the approved plan (scaffold and read-only source DB; cleaning, chunking, normalisation; local embeddings, taxonomy index, hybrid search, prototypes; selection lever). Built unit by unit, each verified with `npm test` and the CLI command named in the plan before moving on. Decisions made while building are listed below as they happen.
+
+**Questions the AI asked / owner's answers:** none yet.
+
+**Verification:** `npm test`: 33 tests in 7 files, all passing; `npm run typecheck` clean. `npm run cli -- ids` prints 30 rows. `npm run cli -- clean-stats`: total 17,789,583 raw to 5,943,113 cleaned (33%); Krier 176,888 to 58,553; Monbana 527,699 to 82,767; needl.co 2,131,190 to 757,396. `npm run cli -- index`: 1,424 categories + 16 prototypes built in 28 s, reloaded in 105 ms. `npm run cli -- search`: "cold brew coffee" -> Refrigerated Cold Brew first; "Kaffeebohnen" -> Coffee Beans first (BM25 empty, dense carries it); "italian sausage" -> Dinner Sausage, Pork Sausage, Plant Based Dinner Sausage Links, no dressing in top 5. `npm run cli -- select 402 --budget 32000`: 46 chunks, privacy-policy chunks 6, 7, 9, 10, 11 dropped, capability and can-size chunks kept. `select 118363`: 1,153 chunks, 60 kept (4.2% of chars) in 22 s.
+
+**Outcome:** accepted, pending the owner's walkthrough and eyeballing of `clean-stats --show-dropped` samples.
+
+**Decisions while building:**
+- U1: `.env` read with Node 22's built-in `process.loadEnvFile()` instead of adding `dotenv`; missing `.env` is not an error so `npm test` needs no env.
+- U1: the read-only test checks the wrapper exposes readers only (`close, getManufacturer, listCategories, listManufacturerIds, taxonomyHash`); the `readonly: true` flag is one line in `src/db/source.ts`.
+- U2: image tags of any URL become their alt text (not only placehold.co), since no image URL in the scrape is real; bare placeholder URLs are stripped; `[text](url)` becomes `text`. This keeps slightly more than the earlier measurement (needl.co 757K vs 733K).
+- U2: hyphens are treated as spaces by the normaliser so `Cold-Brew` and `cold brew` match; quote characters are removed on both sides. Fuzzy matching tokenises on non-letters so trailing punctuation does not break a match (found by the test: `retailers.` vs `retailers`).
+- U3: BM25 is rebuilt in memory at load from the category rows (milliseconds); only the vectors and prototype vectors are persisted in `artifacts/taxonomy-index.bin` with a JSON header carrying taxonomy hash, model id, dims and prototype counts. A change in any of those rebuilds.
+- U3: no stemming in BM25 (whole-word as decided); the multilingual dense side covers plurals and other languages.
+- U4: `pickChunks` is pure (chunks + scores -> indices) so the selection rules are unit-tested without the model; `selectChunks` adds the embedding step. Always-included chunks are exempt from the per-heading cap.
+- U4: the entity-prototype floor is a config knob (`selectEntityFloor` 0.85) with a comment saying so: on needl.co the entity similarity runs 0.71 to 0.86 and only 3 chunks clear 0.85, one of them an investor sentence. The first-2K rule is what carries the marketplace signal today; the floor is measured in U10 when the lever is on.
+- Model cache: `.model-cache/` in the repo root, gitignored (118 MB download on first run; copied from the probe run here).
+
+### 11. Phase B build starts  (2026-09-23, Claude Code)
+
+**Prompt** (verbatim):
+> I have added open ai api key in .env and .env.local file. Please start implementing phase 2/next phase.
+
+**Response summary:** phase B is U5 to U9 (LLM client with live / replay / stub and cache; profile window reads and merge; shortlist; batched judge, validation, policy; orchestration, result store, CLI). Built unit by unit; live calls only from U6 on and only on the dev set first. Decisions listed below as they happen.
+
+**Questions the AI asked / owner's answers:** none yet.
+
+**Verification:** `npm test`: 67 tests in 14 files, all passing; `npm run typecheck` clean. One live smoke call to `gpt-5.6-luna` at low effort returned valid structured output with usage fields (input, cached, output, reasoning). Live profiles: assemblers.com -> `both`, 21 exact quotes, 1 window; carolinabeveragegroup.com -> `both`; spcap.com -> `investor`, no products, 2 windows; needl.co -> `marketplace`, no products, 20 windows. Measured 4.0 chars per token (needl.co: 757,396 chars, 188,055 input tokens), so the 40K-char window is ~10K tokens as designed. `npm run cli -- shortlist 902`: 12 products + 14 capabilities -> 120 candidates. `npm run cli -- tag 507` live: `tagged`, Protein Bar, Energy Bar, Popcorn accepted at 0.99; one judge quote ("Protein Bites") flipped by the quote guard because the evidence says "Protein Bars and Bites". `tag 902`: 5 accepted (Sparkling Water, Energy Drink, Functional Beverage, Ready To Drink Coffee, Ready To Drink Tea). `tag-all --dev` live: 143 tagged 17, 1271 tagged 1, 1807 tagged 54, 118363 not_a_manufacturer, 576000 tagged 19. Second `tag` of a stored id returns the stored row with zero calls.
+
+**Outcome:** accepted for the mechanics; two observations raised with the owner (below).
+
+**Decisions while building:**
+- U5: OpenAI Responses API through `responses.create` with `text.format = zodTextFormat(schema)` and `output_text` parsed by zod in our code, so live and the fake transport share one parse-and-retry path. `store: false` on every request.
+- U5: the cache key includes reasoning effort besides model, prompt version, schema name, system and user text; the plan listed five parts, effort changes the answer so it is a sixth.
+- U5: `llm_cache` rows carry a `tag` (manufacturer id) so replay export groups by manufacturer; export is sorted and pretty-printed so re-export is byte-identical. Only `llm_cache` and `results` tables exist so far; `jobs`, `jev_answers`, `arbiter_verdicts` are added by the units that use them.
+- U5: `.env.local` added to `.gitignore` (the owner created it alongside `.env`); `process.loadEnvFile()` reads `.env` only.
+- U6: card schema as in ARCHITECTURE.md step 5; the window prompt and the merge prompt are `src/prompts/profile.v1.md` and `profile-reduce.v1.md`. A single-window site skips the merge call. Products are also deduplicated in code by normalised name after the merge.
+- U6: `.env` mode default is `replay`; the CLI runs were done with `LLM_MODE=live`.
+- U7: `QUERY_MODE` implemented as name / name_quote / conditional (name + quote when the name has one or two tokens or the top-8 RRF spread is under `shortlistMarginFloor`, a knob). Capability phrases retrieve noise ("Aluminum can packaging" -> Cherry Cola, "Canning" -> Canned Sausage); left for the judge to reject and for phase D to count.
+- U8: the judge's evidence is not the whole site: it is the site head (first 2K cleaned chars) plus every chunk in which a card quote was found. Bounded by the card, not the site, so a 190K-token site is not repeated in every batch. The judge's quote must be found in that evidence.
+- U8: verdicts missing from the model output are recorded as `applies: false` with flag `missing_from_output`; ids outside the batch are dropped and counted (`unknownIds`).
+- U8: storage rule: a storage state counts as evidenced when the judge's quote contains a storage word (en / de / fr list) or a card product that retrieved the candidate carries that storage value.
+- U9: result key = sha256(cleaned text) + prompt versions + model ids + embed model + profile path + query mode + taxonomy hash. `tag` returns the stored row on a hit; `--force` re-runs the pipeline but still uses `llm_cache`.
+- U9: dev set drawn once with a fixed seed and committed as `artifacts/dev-set.json`: 143, 1271, 1807, 118363, 576000.
+- Skipped from the plan's U9 scenarios: "replay with a re-ordered chunk list still hits" (full read is the default; windows are deterministic from cleaning, and the lever stores chunk indices in the result).
+
+**Observations raised with the owner (not changed):**
+- The judge returns `reason` only for `applies: true`, so rejections cannot be explained afterwards: Krier's card says "fruit juices and drinks" (exact quote) and the judge rejected `Juice`, `Fruit Punch`, `Orange Soda` and the other sodas at 0.98 to 1.00 confidence with no reason recorded.
+- The shortlist cap of 120 is hit on product-rich sites: interamericanproducts.com has 110 card products, so many phrases cannot keep even their top hit.
+
+**Questions the AI asked / owner's answers (after the phase B walkthrough):**
+- Should rejections carry a one-line reason too?
+> Yes, reason on every verdict (Recommended)
+- How should the shortlist cap behave on product-rich sites?
+> Scale with phrases: max(120, 3 x phrases) (Recommended)
+
+Decision: judge prompt bumped to `judge.v2.md` (reason required on every verdict, quote only when applies) and `config.prompts.judge = 'v2'`, so earlier v1 judge rows stay in the cache under their own key; shortlist cap = max(120, 3 x number of card phrases).
+
+**Verification after the two decisions:** `npm test` 67 passing. `tag 902` with judge v2: 3 accepted (Sparkling Water, Energy Drink, Functional Beverage); the reasons show the judge reading definitions rather than names: `Juice` rejected because its definition is baby / toddler juice; `Orange Soda`, `Cream Soda`, `Cherry Cola` rejected because the site says "sodas" without a flavour and the taxonomy has no generic soda category; `Fruit Punch` rejected because the evidence says "fruit juices and drinks". Ready To Drink Coffee / Tea, accepted at 0.82 under v1, were rejected under v2: run-to-run judge variance to be measured as the noise floor in phase D. `tag 1807` with the scaled cap: shortlist 330 (was 120), 12 batches, 78 accepted (was 54), $0.072 (was $0.035), 247 s.
+
+**Outcome:** accepted.
