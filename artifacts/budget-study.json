@@ -1,0 +1,2205 @@
+{
+  "generatedAt": "2026-09-24T07:10:50.988Z",
+  "budgets": [
+    16000,
+    32000,
+    64000
+  ],
+  "matchFloor": 0.9,
+  "sites": [
+    {
+      "id": 143,
+      "domain": "refresco.com",
+      "cleanedChars": 263927,
+      "fullA": {
+        "products": 32,
+        "costUsd": 0.022363200000000003
+      },
+      "fullB": {
+        "products": 40,
+        "costUsd": 0.01173534,
+        "lostVsA": [
+          "Nectars",
+          "Mocktails",
+          "Liquid dairy products"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 10,
+          "lostVsA": [
+            "Nectars",
+            "Sparkling water",
+            "Beers and radlers",
+            "Alcohol-free beers",
+            "Spirits",
+            "Tonic water",
+            "Mocktails",
+            "Plant-based beverages",
+            "Liquid dairy products",
+            "Beverage concentrates",
+            "Almond-based beverages",
+            "Premium juices",
+            "Plant protein drinks",
+            "Breakfast drinks"
+          ],
+          "keptFraction": 0.06067252016725733,
+          "costUsd": 0.00109012,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 14,
+          "lostVsA": [
+            "Nectars",
+            "Sparkling water",
+            "Beers and radlers",
+            "Alcohol-free beers",
+            "Spirits",
+            "Tonic water",
+            "Mocktails",
+            "Liquid dairy products",
+            "Beverage concentrates",
+            "Breakfast drinks"
+          ],
+          "keptFraction": 0.12137539556661835,
+          "costUsd": 0.00149102,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 20,
+          "lostVsA": [
+            "Sparkling water",
+            "Beers and radlers",
+            "Spirits",
+            "Tonic water",
+            "Mocktails",
+            "Liquid dairy products"
+          ],
+          "keptFraction": 0.242621781396796,
+          "costUsd": 0.00501706,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 289,
+      "domain": "nellsonllc.com",
+      "cleanedChars": 320660,
+      "fullA": {
+        "products": 26,
+        "costUsd": 0.022528000000000003
+      },
+      "fullB": {
+        "products": 12,
+        "costUsd": 0.008311659999999998,
+        "lostVsA": [
+          "Extruded bars",
+          "Co-extruded bars",
+          "Drizzle toppings",
+          "Fruit nut toppings",
+          "Pretzel toppings",
+          "Decorative toppings"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 14,
+          "lostVsA": [
+            "Extruded bars",
+            "Co-extruded bars",
+            "Breakfast cereal bars",
+            "Confectionery coatings",
+            "Drizzle toppings",
+            "Fruit nut toppings",
+            "Pretzel toppings",
+            "Decorative toppings"
+          ],
+          "keptFraction": 0.049965330051661344,
+          "costUsd": 0.0016672,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 12,
+          "lostVsA": [
+            "Performance drinks",
+            "Extruded bars",
+            "Co-extruded bars",
+            "Breakfast cereal bars",
+            "Confectionery coatings",
+            "Drizzle toppings",
+            "Fruit nut toppings",
+            "Pretzel toppings",
+            "Decorative toppings"
+          ],
+          "keptFraction": 0.0999181664282457,
+          "costUsd": 0.0025218000000000003,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 13,
+          "lostVsA": [
+            "Extruded bars",
+            "Co-extruded bars",
+            "Confectionery coatings",
+            "Drizzle toppings",
+            "Fruit nut toppings",
+            "Pretzel toppings",
+            "Decorative toppings"
+          ],
+          "keptFraction": 0.19987381388172237,
+          "costUsd": 0.006551200000000001,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 402,
+      "domain": "carolinabeveragegroup.com",
+      "cleanedChars": 25298,
+      "fullA": {
+        "products": 12,
+        "costUsd": 0.00136582
+      },
+      "fullB": {
+        "products": 13,
+        "costUsd": 0.00173182,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 17,
+          "lostVsA": [],
+          "keptFraction": 0.6329149011998575,
+          "costUsd": 0.0016403400000000001,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": true,
+          "products": 12,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.00136582,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": true,
+          "products": 12,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.00136582,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 407,
+      "domain": "trufoodmfg.com",
+      "cleanedChars": 49820,
+      "fullA": {
+        "products": 19,
+        "costUsd": 0.00541196
+      },
+      "fullB": {
+        "products": 20,
+        "costUsd": 0.00468592,
+        "lostVsA": [
+          "Baked goods"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 22,
+          "lostVsA": [],
+          "keptFraction": 0.3215427617687868,
+          "costUsd": 0.00108804,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 26,
+          "lostVsA": [],
+          "keptFraction": 0.556616863399626,
+          "costUsd": 0.0011569399999999997,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": true,
+          "products": 19,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.00541196,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 507,
+      "domain": "assemblers.com",
+      "cleanedChars": 4451,
+      "fullA": {
+        "products": 8,
+        "costUsd": 0.0009858
+      },
+      "fullB": {
+        "products": 8,
+        "costUsd": 0.00070356,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": true,
+          "products": 8,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.0009858,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": true,
+          "products": 8,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.0009858,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": true,
+          "products": 8,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.0009858,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 707,
+      "domain": "portlandbottling.com",
+      "cleanedChars": 53066,
+      "fullA": {
+        "products": 14,
+        "costUsd": 0.00506856
+      },
+      "fullB": {
+        "products": 14,
+        "costUsd": 0.0030857799999999998,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 11,
+          "lostVsA": [],
+          "keptFraction": 0.3020457507697539,
+          "costUsd": 0.0009269199999999999,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 11,
+          "lostVsA": [],
+          "keptFraction": 0.6043937361869322,
+          "costUsd": 0.0010436799999999997,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": true,
+          "products": 14,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.00506856,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 902,
+      "domain": "krierfoods.com",
+      "cleanedChars": 58553,
+      "fullA": {
+        "products": 9,
+        "costUsd": 0.00438214
+      },
+      "fullB": {
+        "products": 13,
+        "costUsd": 0.0026580399999999995,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 12,
+          "lostVsA": [],
+          "keptFraction": 0.2736993379069648,
+          "costUsd": 0.0016832000000000001,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 11,
+          "lostVsA": [],
+          "keptFraction": 0.5125147559494277,
+          "costUsd": 0.0021114000000000003,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": true,
+          "products": 9,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.00438214,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 1060,
+      "domain": "innomarkinc.com",
+      "cleanedChars": 15377,
+      "fullA": {
+        "products": 23,
+        "costUsd": 0.00136926
+      },
+      "fullB": {
+        "products": 23,
+        "costUsd": 0.0020772,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": true,
+          "products": 23,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.00136926,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": true,
+          "products": 23,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.00136926,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": true,
+          "products": 23,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.00136926,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 1271,
+      "domain": "tailoredbottlingsolutions.com",
+      "cleanedChars": 42054,
+      "fullA": {
+        "products": 1,
+        "costUsd": 0.0017016800000000001
+      },
+      "fullB": {
+        "products": 1,
+        "costUsd": 0.0032496,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 2,
+          "lostVsA": [],
+          "keptFraction": 0.2519703788365836,
+          "costUsd": 0.0007698000000000001,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [
+            "Beverage drinks"
+          ],
+          "keptFraction": 0.2519703788365836,
+          "costUsd": 0.00061356,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": true,
+          "products": 1,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.0017016800000000001,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 1683,
+      "domain": "thedrinkink.com",
+      "cleanedChars": 20713,
+      "fullA": {
+        "products": 13,
+        "costUsd": 0.0024088
+      },
+      "fullB": {
+        "products": 10,
+        "costUsd": 0.0022048000000000002,
+        "lostVsA": [
+          "carbonated beverages"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 13,
+          "lostVsA": [],
+          "keptFraction": 0.7740312515117798,
+          "costUsd": 0.0021948000000000002,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": true,
+          "products": 13,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.0024088,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": true,
+          "products": 13,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.0024088,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 1807,
+      "domain": "interamericanproducts.com",
+      "cleanedChars": 42532,
+      "fullA": {
+        "products": 84,
+        "costUsd": 0.01127368
+      },
+      "fullB": {
+        "products": 101,
+        "costUsd": 0.0130114,
+        "lostVsA": [
+          "Rice"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 36,
+          "lostVsA": [
+            "Spices",
+            "Seasoning Pouches",
+            "Rice",
+            "Hot Cereal",
+            "Hot Cocoa",
+            "Trail Mix",
+            "Rolls",
+            "Sweet Goods",
+            "Danish",
+            "Dips",
+            "Icing and Glazes",
+            "Frosting",
+            "Carbonated Soft Drinks",
+            "Non-Carbonated Soft Drinks",
+            "Fluid Milk",
+            "ESL Milk",
+            "Citrus Punch",
+            "Sour Cream",
+            "Cottage Cheese",
+            "Natural and Processed Cheese",
+            "Aseptic Products",
+            "Ice Cream",
+            "Novelties",
+            "Peanut Butter",
+            "Worcestershire Sauce",
+            "Cooking Vinegars",
+            "Red Sauces",
+            "Syrups",
+            "Jams and Jellies",
+            "Canned Broth",
+            "Broth",
+            "Dry Dog Food",
+            "Dry Cat Food",
+            "Tortillas",
+            "Fresh Bakery",
+            "Frozen Dough",
+            "Ice Cream Novelties",
+            "Soups",
+            "Mixers",
+            "Gallon Water"
+          ],
+          "keptFraction": 0.15200301275714354,
+          "costUsd": 0.0023778000000000002,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 38,
+          "lostVsA": [
+            "Spices",
+            "Seasoning Pouches",
+            "Rice",
+            "Hot Cereal",
+            "Hot Cocoa",
+            "Trail Mix",
+            "Danish",
+            "Dips",
+            "Frosting",
+            "Carbonated Soft Drinks",
+            "Non-Carbonated Soft Drinks",
+            "Fluid Milk",
+            "ESL Milk",
+            "Citrus Punch",
+            "Sour Cream",
+            "Cottage Cheese",
+            "Natural and Processed Cheese",
+            "Aseptic Products",
+            "Ice Cream",
+            "Novelties",
+            "Peanut Butter",
+            "Worcestershire Sauce",
+            "Cooking Vinegars",
+            "Soy Sauce",
+            "Red Sauces",
+            "Syrups",
+            "Jams and Jellies",
+            "Canned Broth",
+            "Broth",
+            "Dry Dog Food",
+            "Dry Cat Food",
+            "Tortillas",
+            "Fresh Bakery",
+            "Ice Cream Novelties",
+            "Soups",
+            "Mixers",
+            "Gallon Water"
+          ],
+          "keptFraction": 0.15200301275714354,
+          "costUsd": 0.00182964,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": true,
+          "products": 84,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.01127368,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 2217,
+      "domain": "bigbrandsllc.com",
+      "cleanedChars": 235211,
+      "fullA": {
+        "products": 121,
+        "costUsd": 0.030318440000000002
+      },
+      "fullB": {
+        "products": 118,
+        "costUsd": 0.03343924,
+        "lostVsA": [
+          "Paleo bars",
+          "Energy shots",
+          "Industrial hemp drinks",
+          "Hard cider",
+          "Hard tea",
+          "Hard lemonade",
+          "Mocktails",
+          "Creamers",
+          "Hop water",
+          "Homeopathic sprays"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 26,
+          "lostVsA": [
+            "Waters",
+            "Teas",
+            "Nutritional products",
+            "Plant-based bars",
+            "Paleo bars",
+            "Dairy products",
+            "Oils",
+            "Sauces",
+            "Marinades",
+            "Mixers",
+            "Fruit purees",
+            "Sodas",
+            "Probiotic bars",
+            "Granola bars",
+            "Bar mixes",
+            "Flavored sparkling waters",
+            "Vitamin-infused water",
+            "Vitamin supplements",
+            "Coffees",
+            "Nutritional gummies",
+            "Lozenges",
+            "Capsules",
+            "Soft gels",
+            "Gummies",
+            "Tequila cocktails",
+            "Sparkling wines",
+            "Mocktails",
+            "Spring water",
+            "Hop water",
+            "Homeopathic sprays"
+          ],
+          "keptFraction": 0.06812094682921221,
+          "costUsd": 0.00130294,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 37,
+          "lostVsA": [
+            "Waters",
+            "Teas",
+            "Nutritional products",
+            "Protein bars",
+            "Fiber bars",
+            "Vitamin bars",
+            "Plant-based bars",
+            "Vegan bars",
+            "Paleo bars",
+            "Weight loss bars",
+            "Dairy products",
+            "Oils",
+            "Sauces",
+            "Marinades",
+            "Mixers",
+            "Fruit purees",
+            "Nutraceuticals",
+            "Sodas",
+            "Probiotic bars",
+            "Granola bars",
+            "Breakfast bars",
+            "Bar mixes",
+            "Flavored sparkling waters",
+            "Frozen drinks",
+            "Vitamin-infused water",
+            "Vitamin supplements",
+            "Nutritional gummies",
+            "Lozenges",
+            "Capsules",
+            "Soft gels",
+            "Gummies",
+            "Nutritional bars",
+            "Sparkling wines",
+            "Spring water",
+            "Hop water",
+            "Homeopathic sprays"
+          ],
+          "keptFraction": 0.1362248612926714,
+          "costUsd": 0.0023909,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 49,
+          "lostVsA": [
+            "Sugar brew",
+            "Paleo bars",
+            "Dairy products",
+            "Oils",
+            "Marinades",
+            "Mixers",
+            "Sodas",
+            "Granola bars",
+            "Breakfast bars",
+            "Bar mixes",
+            "Flavored sparkling waters",
+            "Vitamin-infused water",
+            "Daily juice supplements",
+            "Nutritional gummies",
+            "Lozenges",
+            "Capsules",
+            "Gummies",
+            "Sparkling wines",
+            "Spring water",
+            "Creamers",
+            "Homeopathic sprays"
+          ],
+          "keptFraction": 0.27251359395691666,
+          "costUsd": 0.0082513,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 2480,
+      "domain": "usbeveragemanufacturing.com",
+      "cleanedChars": 13361,
+      "fullA": {
+        "products": 26,
+        "costUsd": 0.0018118
+      },
+      "fullB": {
+        "products": 26,
+        "costUsd": 0.0013452399999999997,
+        "lostVsA": [
+          "Vitamin Water",
+          "Cocktail Formulations"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": true,
+          "products": 26,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.0018118,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": true,
+          "products": 26,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.0018118,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": true,
+          "products": 26,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.0018118,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 8777,
+      "domain": "johnvince.com",
+      "cleanedChars": 125533,
+      "fullA": {
+        "products": 48,
+        "costUsd": 0.01009908
+      },
+      "fullB": {
+        "products": 27,
+        "costUsd": 0.00676906,
+        "lostVsA": [
+          "Hard Candies",
+          "Almonds",
+          "Cashews",
+          "Chia Seeds",
+          "Sesame Sticks",
+          "Okra Chips",
+          "Plantain Chips"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 22,
+          "lostVsA": [
+            "Hard Candies",
+            "Almonds",
+            "Cashews",
+            "Chia Seeds",
+            "Sesame Sticks",
+            "Okra Chips",
+            "Plantain Chips",
+            "Almond Cashew Brittle",
+            "Baking Ingredients",
+            "Confectionery",
+            "Grains"
+          ],
+          "keptFraction": 0.12804404715222037,
+          "costUsd": 0.00139854,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 24,
+          "lostVsA": [
+            "Licorice",
+            "Almonds",
+            "Cashews",
+            "Chia Seeds",
+            "Sesame Sticks",
+            "Okra Chips",
+            "Plantain Chips",
+            "Sour Gummy Bites",
+            "Almond Cashew Brittle",
+            "Better-for-You Chocolate",
+            "Baking Ingredients",
+            "Confectionery",
+            "Grains"
+          ],
+          "keptFraction": 0.25606408604559966,
+          "costUsd": 0.0016123799999999998,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 29,
+          "lostVsA": [
+            "Seasoned Mixes",
+            "Snack Mixes",
+            "Licorice",
+            "Almonds",
+            "Walnuts",
+            "Chia Seeds",
+            "Sesame Sticks",
+            "Okra Chips",
+            "Mixed Veggie Chips",
+            "Plantain Chips",
+            "Sour Gummy Bites",
+            "Almond Cashew Brittle",
+            "Baking Ingredients",
+            "Confectionery",
+            "Grains"
+          ],
+          "keptFraction": 0.5121201693382523,
+          "costUsd": 0.00475944,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 9668,
+      "domain": "inw-group.com",
+      "cleanedChars": 105269,
+      "fullA": {
+        "products": 52,
+        "costUsd": 0.00960652
+      },
+      "fullB": {
+        "products": 51,
+        "costUsd": 0.006194119999999999,
+        "lostVsA": [
+          "Personal care products",
+          "Pre-workout"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 27,
+          "lostVsA": [
+            "Probiotics",
+            "Digestive enzymes",
+            "Protein blends",
+            "Pre-workout",
+            "Amino acids",
+            "Fish oil",
+            "Energy shots",
+            "Bites and truffles",
+            "Skin serums",
+            "Aloe vera beverages",
+            "Analgesic pain relief",
+            "Household cleaners"
+          ],
+          "keptFraction": 0.15220949263502456,
+          "costUsd": 0.00174844,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 30,
+          "lostVsA": [
+            "Bites",
+            "Liquid dosage",
+            "Probiotics",
+            "Meal replacement powder",
+            "Pet care products",
+            "Aloe vera beverages",
+            "Analgesic pain relief",
+            "Household cleaners",
+            "Pet shampoo"
+          ],
+          "keptFraction": 0.30422867582689456,
+          "costUsd": 0.00193828,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 42,
+          "lostVsA": [
+            "Bites",
+            "Cremes",
+            "Digestive enzymes",
+            "Aloe vera beverages",
+            "Analgesic pain relief"
+          ],
+          "keptFraction": 0.5982091881399155,
+          "costUsd": 0.00500048,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 11317,
+      "domain": "lilyofthedesert.com",
+      "cleanedChars": 189885,
+      "fullA": {
+        "products": 26,
+        "costUsd": 0.0151346
+      },
+      "fullB": {
+        "products": 30,
+        "costUsd": 0.011245680000000001,
+        "lostVsA": [
+          "Electrolyte drink mixes"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 5,
+          "lostVsA": [
+            "Aloe styling spray",
+            "Electrolyte drink mixes",
+            "Vitamin hydration drink",
+            "Sports hydration drink",
+            "Hand sanitizer",
+            "Sanitizers",
+            "Soaps and body washes",
+            "Disinfectant products",
+            "Beverages",
+            "Small liquids",
+            "Specialty oils",
+            "Nutritional powders",
+            "Bulk food service items",
+            "Cold brew coffee",
+            "Cold brew teas",
+            "Herbal concentrates",
+            "Ready-to-drink beverages"
+          ],
+          "keptFraction": 0.08439931425557168,
+          "costUsd": 0.0009219,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 9,
+          "lostVsA": [
+            "Electrolyte drink mixes",
+            "Hand sanitizer",
+            "Sanitizers",
+            "Soaps and body washes",
+            "Disinfectant products",
+            "Small liquids",
+            "Specialty oils",
+            "Nutritional powders",
+            "Bulk food service items",
+            "Cold brew coffee",
+            "Cold brew teas",
+            "Herbal concentrates"
+          ],
+          "keptFraction": 0.16879335355400238,
+          "costUsd": 0.00055158,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 11,
+          "lostVsA": [
+            "Beverages",
+            "Small liquids",
+            "Specialty oils",
+            "Nutritional powders",
+            "Bulk food service items",
+            "Cold brew coffee",
+            "Cold brew teas",
+            "Herbal concentrates",
+            "Ready-to-drink beverages"
+          ],
+          "keptFraction": 0.3375708822365818,
+          "costUsd": 0.00326392,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 12022,
+      "domain": "alphaaromatics.com",
+      "cleanedChars": 968405,
+      "fullA": {
+        "products": 50,
+        "costUsd": 0.04937318
+      },
+      "fullB": {
+        "products": 48,
+        "costUsd": 0.030864339999999994,
+        "lostVsA": [
+          "Lotions",
+          "Eau de cologne",
+          "Eau fraiche",
+          "Neutralizing additives"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 7,
+          "lostVsA": [
+            "Personal care products",
+            "Cosmetics",
+            "Odor neutralizers",
+            "Odor control additives",
+            "Industrial air fresheners",
+            "Household cleaning products",
+            "Soaps",
+            "Shampoos",
+            "Lotions",
+            "Body washes",
+            "Shower gels",
+            "Reed diffuser fragrances",
+            "Eau de cologne",
+            "Eau fraiche",
+            "Eau de toilette",
+            "Air fresheners",
+            "Space sprays",
+            "Carpet powders",
+            "Fabric fresheners",
+            "Pet products",
+            "Perfumes and colognes",
+            "Industrial cleaners",
+            "Laundry products",
+            "Neutralizing additives"
+          ],
+          "keptFraction": 0.016493798670818807,
+          "costUsd": 0.0013514,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 5,
+          "lostVsA": [
+            "Personal care products",
+            "Cosmetics",
+            "Odor neutralizers",
+            "Odor control additives",
+            "Industrial air fresheners",
+            "Household cleaning products",
+            "Soaps",
+            "Shampoos",
+            "Lotions",
+            "Body washes",
+            "Shower gels",
+            "Reed diffuser fragrances",
+            "Eau de cologne",
+            "Eau fraiche",
+            "Eau de toilette",
+            "Air fresheners",
+            "Space sprays",
+            "Carpet powders",
+            "Fabric fresheners",
+            "Pet products",
+            "Perfumes and colognes",
+            "Industrial cleaners",
+            "Laundry products",
+            "Neutralizing additives"
+          ],
+          "keptFraction": 0.033081682195837105,
+          "costUsd": 0.00068796,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 12,
+          "lostVsA": [
+            "Cosmetics",
+            "Odor neutralizers",
+            "Odor control additives",
+            "Industrial air fresheners",
+            "Household cleaning products",
+            "Soaps",
+            "Shampoos",
+            "Lotions",
+            "Fabric softener fragrances",
+            "Body washes",
+            "Shower gels",
+            "Eau de cologne",
+            "Eau fraiche",
+            "Eau de toilette",
+            "Air fresheners",
+            "Space sprays",
+            "Carpet powders",
+            "Fabric fresheners",
+            "Pet products",
+            "Perfumes and colognes",
+            "Industrial cleaners",
+            "Laundry products",
+            "Neutralizing additives"
+          ],
+          "keptFraction": 0.06613751690425677,
+          "costUsd": 0.00222428,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 28948,
+      "domain": "tataconsumer.com",
+      "cleanedChars": 317849,
+      "fullA": {
+        "products": 101,
+        "costUsd": 0.02420704
+      },
+      "fullB": {
+        "products": 90,
+        "costUsd": 0.02319032,
+        "lostVsA": [
+          "honey and preserves",
+          "solubles",
+          "water",
+          "body care products",
+          "grains",
+          "nuts and seeds",
+          "apple cider vinegar",
+          "Chyawanprash",
+          "gravies and pastes",
+          "fruit preserves",
+          "millet cereals",
+          "personal care products",
+          "roasted vermicelli",
+          "lentils",
+          "cooking oils",
+          "oats",
+          "chilli sauces",
+          "fruit infusions"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 31,
+          "lostVsA": [
+            "vending beverages",
+            "solubles",
+            "water",
+            "pulses",
+            "ready-to-cook foods",
+            "cereals",
+            "mini meals",
+            "ready-to-eat foods",
+            "body care products",
+            "plant-based meat",
+            "plant protein powder",
+            "grains",
+            "natural sweeteners",
+            "multi-floral honey",
+            "apple cider vinegar",
+            "Chyawanprash",
+            "soups",
+            "Pasta masala",
+            "Peri peri masala",
+            "Ginger garlic paste",
+            "chutneys",
+            "masalas",
+            "ready-to-eat meals",
+            "ready-to-cook gravies",
+            "tomato pasta",
+            "Indian RTE meals",
+            "Indian RTC gravies",
+            "gravies and pastes",
+            "healthy snacks",
+            "plant-based protein drinks",
+            "besan",
+            "poha",
+            "nutrimixes",
+            "dry fruits",
+            "hing",
+            "ragi atta",
+            "glucose-based drinks",
+            "instant coffee powder",
+            "kombucha",
+            "energy drinks",
+            "pepper",
+            "green tea",
+            "oil and ghee",
+            "personal care products",
+            "roasted vermicelli",
+            "lentils",
+            "cooking oils",
+            "ghee",
+            "oats",
+            "granola",
+            "soy sauce",
+            "sparkling water",
+            "fruit infusions",
+            "green teas",
+            "whole bean coffee",
+            "coffee pods",
+            "decaf coffee",
+            "flavored coffee",
+            "specialty coffee",
+            "rooibos tea",
+            "oolong tea",
+            "white tea",
+            "cold brew tea",
+            "matcha tea",
+            "packaged tea"
+          ],
+          "keptFraction": 0.050415957647948574,
+          "costUsd": 0.00221,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 26,
+          "lostVsA": [
+            "salt",
+            "saffron",
+            "vending beverages",
+            "solubles",
+            "water",
+            "pulses",
+            "spices",
+            "cereals",
+            "mini meals",
+            "instant coffee",
+            "instant tea",
+            "body care products",
+            "plant-based meat",
+            "plant protein powder",
+            "grains",
+            "nuts and seeds",
+            "natural sweeteners",
+            "multi-floral honey",
+            "apple cider vinegar",
+            "Chyawanprash",
+            "soups",
+            "Pasta masala",
+            "Peri peri masala",
+            "Ginger garlic paste",
+            "chutneys",
+            "masalas",
+            "ready-to-eat meals",
+            "ready-to-cook gravies",
+            "tomato pasta",
+            "Indian RTE meals",
+            "Indian RTC gravies",
+            "gravies and pastes",
+            "millet cereals",
+            "healthy snacks",
+            "plant-based protein drinks",
+            "besan",
+            "poha",
+            "nutrimixes",
+            "dry fruits",
+            "hing",
+            "ragi atta",
+            "glucose-based drinks",
+            "liquid coffee concentrate",
+            "instant coffee powder",
+            "roast and ground coffee",
+            "kombucha",
+            "energy drinks",
+            "pepper",
+            "instant tea powders",
+            "oil and ghee",
+            "personal care products",
+            "lentils",
+            "cooking oils",
+            "oats",
+            "granola",
+            "chilli sauces",
+            "sparkling water",
+            "black tea blends",
+            "fruit infusions",
+            "ground coffee",
+            "whole bean coffee",
+            "coffee pods",
+            "decaf coffee",
+            "flavored coffee",
+            "specialty coffee",
+            "rooibos tea",
+            "oolong tea",
+            "white tea",
+            "cold brew tea",
+            "matcha tea",
+            "packaged tea"
+          ],
+          "keptFraction": 0.10082561290729186,
+          "costUsd": 0.002965,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 54,
+          "lostVsA": [
+            "salt",
+            "honey and preserves",
+            "vending beverages",
+            "solubles",
+            "pulses",
+            "spices",
+            "cereals",
+            "snacks",
+            "mini meals",
+            "body care products",
+            "plant-based meat",
+            "plant protein powder",
+            "grains",
+            "natural sweeteners",
+            "multi-floral honey",
+            "apple cider vinegar",
+            "Chyawanprash",
+            "soups",
+            "Peri peri masala",
+            "Ginger garlic paste",
+            "masalas",
+            "ready-to-eat meals",
+            "ready-to-cook gravies",
+            "tomato pasta",
+            "Indian RTE meals",
+            "Indian RTC gravies",
+            "gravies and pastes",
+            "fruit preserves",
+            "healthy snacks",
+            "plant-based protein drinks",
+            "besan",
+            "nutrimixes",
+            "hing",
+            "glucose-based drinks",
+            "liquid coffee concentrate",
+            "instant coffee powder",
+            "kombucha",
+            "energy drinks",
+            "pepper",
+            "ragi flour",
+            "oil and ghee",
+            "personal care products",
+            "lentils",
+            "sparkling water",
+            "fruit infusions",
+            "whole bean coffee",
+            "coffee pods",
+            "decaf coffee",
+            "flavored coffee",
+            "specialty coffee",
+            "rooibos tea",
+            "oolong tea",
+            "white tea",
+            "cold brew tea",
+            "matcha tea",
+            "packaged tea"
+          ],
+          "keptFraction": 0.20166067939749166,
+          "costUsd": 0.0083482,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 77698,
+      "domain": "lacharlotte.com",
+      "cleanedChars": 55779,
+      "fullA": {
+        "products": 46,
+        "costUsd": 0.00760798
+      },
+      "fullB": {
+        "products": 25,
+        "costUsd": 0.0038955400000000003,
+        "lostVsA": [
+          "Coconut mango dome",
+          "Exotic vanilla vacherin",
+          "Hazelnut caramel sphere",
+          "Lime raspberry bar",
+          "Opera cake",
+          "Chocolate caramel present",
+          "Chocolate dome",
+          "Caramel chocolate bar",
+          "Browcheese cake",
+          "Almond milk cherry sphere",
+          "Profiteroles",
+          "Mini merveilleux",
+          "Chocolate caramel pumpkin",
+          "Dessert logs"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 16,
+          "lostVsA": [
+            "Apple pastry",
+            "Coconut mango dome",
+            "Coffee Opera",
+            "Exotic vanilla vacherin",
+            "Hazelnut caramel sphere",
+            "Lime raspberry bar",
+            "Apple love pastry",
+            "Pont-neuf pastry",
+            "Chocolate dome",
+            "Browcheese cake",
+            "Apricot hazelnut bar",
+            "Almond milk cherry sphere",
+            "Profiteroles",
+            "Mini merveilleux",
+            "Molded products",
+            "Dessert logs"
+          ],
+          "keptFraction": 0.28799524778139796,
+          "costUsd": 0.0021844,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 15,
+          "lostVsA": [
+            "Cocoa pod pastry",
+            "Apple pastry",
+            "Orange pastry",
+            "Pear pastry",
+            "Cocoa coffee profiteroles",
+            "Cocoa pear profiteroles",
+            "Coconut mango dome",
+            "Coffee Opera",
+            "Exotic vanilla vacherin",
+            "Hazelnut caramel sphere",
+            "Lime raspberry bar",
+            "Apple love pastry",
+            "Pont-neuf pastry",
+            "Cocoa caramel profiteroles",
+            "Opera cake",
+            "Chocolate caramel present",
+            "Chocolate dome",
+            "Caramel chocolate bar",
+            "Browcheese cake",
+            "Apricot hazelnut bar",
+            "Almond milk cherry sphere",
+            "Mini merveilleux",
+            "Chocolate caramel pumpkin",
+            "Dessert logs"
+          ],
+          "keptFraction": 0.5759364930786817,
+          "costUsd": 0.0026264,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": true,
+          "products": 46,
+          "lostVsA": [],
+          "keptFraction": 1,
+          "costUsd": 0.00760798,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 118363,
+      "domain": "needl.co",
+      "cleanedChars": 757396,
+      "fullA": {
+        "products": 0,
+        "costUsd": 0.031368860000000005
+      },
+      "fullB": {
+        "products": 0,
+        "costUsd": 0.04175335999999999,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.02114925870486245,
+          "costUsd": 0.0010126,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.04230645135696944,
+          "costUsd": 0.0017650000000000003,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.08462612595934646,
+          "costUsd": 0.00075308,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 156823,
+      "domain": "brynwoodpartners.com",
+      "cleanedChars": 247681,
+      "fullA": {
+        "products": 0,
+        "costUsd": 0.0056814199999999995
+      },
+      "fullB": {
+        "products": 0,
+        "costUsd": 0.00238594,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.06472192106668392,
+          "costUsd": 0.00021551999999999997,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.1294519328791728,
+          "costUsd": 0.0016642,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.25889577501254063,
+          "costUsd": 0.0035242000000000003,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 166353,
+      "domain": "spcap.com",
+      "cleanedChars": 71889,
+      "fullA": {
+        "products": 0,
+        "costUsd": 0.00078498
+      },
+      "fullB": {
+        "products": 0,
+        "costUsd": 0.0007559800000000001,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.22296421252213192,
+          "costUsd": 0.0002174,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.4456217150664306,
+          "costUsd": 0.00028182,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.5337868923308564,
+          "costUsd": 0.00031384,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 196225,
+      "domain": "anona.de",
+      "cleanedChars": 195435,
+      "fullA": {
+        "products": 58,
+        "costUsd": 0.01164964
+      },
+      "fullB": {
+        "products": 61,
+        "costUsd": 0.01373408,
+        "lostVsA": [
+          "Powerriegel",
+          "Chocolate-coated bars"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 18,
+          "lostVsA": [
+            "Pastries",
+            "Fitness nutrition",
+            "Sports nutrition",
+            "Diet nutrition",
+            "Protein cookies",
+            "Protein crackers",
+            "Fiber-enriched cookies",
+            "Cookies",
+            "Vegan cookies",
+            "Filled cookies",
+            "Protein drinks",
+            "Gainers",
+            "Meal replacement shakes",
+            "Soups",
+            "Muesli",
+            "Porridge",
+            "Isotonic drink powders",
+            "Fiber drinks",
+            "Superfoods",
+            "Flavor systems",
+            "High-calorie foods",
+            "Multi-layer bars",
+            "Energy cereal bars",
+            "Scoop ice cream bases",
+            "Powerriegel",
+            "Fitness and sports nutrition",
+            "Diet and weight management nutrition",
+            "Vital lifestyle nutrition",
+            "Chocolate-coated bars"
+          ],
+          "keptFraction": 0.08193579791458509,
+          "costUsd": 0.0010473,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 18,
+          "lostVsA": [
+            "Protein cookies",
+            "Protein crackers",
+            "Fiber-enriched cookies",
+            "Cookies",
+            "Vegan cookies",
+            "Filled cookies",
+            "Gainers",
+            "Meal replacement shakes",
+            "Soups",
+            "Muesli",
+            "Porridge",
+            "Isotonic drink powders",
+            "Baking mixes",
+            "Superfoods",
+            "Flavor systems",
+            "High-calorie foods",
+            "Multi-layer bars",
+            "Powerriegel",
+            "Fitness and sports nutrition",
+            "Diet and weight management nutrition",
+            "Chocolate-coated bars"
+          ],
+          "keptFraction": 0.16390233904644788,
+          "costUsd": 0.0014167000000000001,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 20,
+          "lostVsA": [
+            "Sports nutrition",
+            "Protein cookies",
+            "Protein crackers",
+            "Fiber-enriched cookies",
+            "Cookies",
+            "Vegan cookies",
+            "Filled cookies",
+            "Gainers",
+            "Meal replacement shakes",
+            "Soups",
+            "Muesli",
+            "Porridge",
+            "Isotonic drink powders",
+            "Baking mixes",
+            "Superfoods",
+            "Flavor systems",
+            "Multi-layer bars",
+            "Powerriegel",
+            "Vital lifestyle nutrition",
+            "Chocolate-coated bars"
+          ],
+          "keptFraction": 0.3279276509620065,
+          "costUsd": 0.0040027,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 382171,
+      "domain": "mzb-group.com",
+      "cleanedChars": 242462,
+      "fullA": {
+        "products": 29,
+        "costUsd": 0.0225974
+      },
+      "fullB": {
+        "products": 27,
+        "costUsd": 0.012716040000000001,
+        "lostVsA": [
+          "Colonial products"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 12,
+          "lostVsA": [
+            "Syrups",
+            "Frappé mixes",
+            "Plant-based milk alternatives",
+            "Ketchup",
+            "Espresso capsules",
+            "Ground coffee",
+            "Professional coffee machines",
+            "Office beverage machines"
+          ],
+          "keptFraction": 0.06604669601341251,
+          "costUsd": 0.0010764,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 10,
+          "lostVsA": [
+            "Syrups",
+            "Frappé mixes",
+            "Plant-based milk alternatives",
+            "Ketchup",
+            "Espresso capsules",
+            "Whole bean coffee",
+            "Colonial products",
+            "Food products",
+            "Professional coffee machines",
+            "Office beverage machines"
+          ],
+          "keptFraction": 0.0806650093738902,
+          "costUsd": 0.00110476,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 9,
+          "lostVsA": [
+            "Tea",
+            "Syrups",
+            "Frappé mixes",
+            "Plant-based milk alternatives",
+            "Ketchup",
+            "Powdered sauces",
+            "Colonial products",
+            "Cocoa",
+            "Food products",
+            "Office beverage machines",
+            "Sauces"
+          ],
+          "keptFraction": 0.0806650093738902,
+          "costUsd": 0.00135076,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 576000,
+      "domain": "monbana.com",
+      "cleanedChars": 82767,
+      "fullA": {
+        "products": 36,
+        "costUsd": 0.00789668
+      },
+      "fullB": {
+        "products": 48,
+        "costUsd": 0.0109012,
+        "lostVsA": [
+          "Calissons"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 19,
+          "lostVsA": [
+            "Speculoos biscuits",
+            "Ready-to-drink chocolate",
+            "Calissons",
+            "Dietetic powders",
+            "Truffles",
+            "Chocolate-filled oysters",
+            "Frappé drinks",
+            "Ready-to-use milkshakes",
+            "Dessert kits"
+          ],
+          "keptFraction": 0.19385652289863506,
+          "costUsd": 0.0009672799999999999,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 35,
+          "lostVsA": [
+            "Calissons",
+            "Truffles",
+            "Chocolate-filled oysters",
+            "Frappé drinks",
+            "Dessert kits"
+          ],
+          "keptFraction": 0.38789487720319055,
+          "costUsd": 0.0030143999999999995,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 32,
+          "lostVsA": [
+            "Truffles",
+            "Chocolate-filled oysters",
+            "Frappé drinks"
+          ],
+          "keptFraction": 0.7425994617790385,
+          "costUsd": 0.0078902,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 576761,
+      "domain": "Johnvince.com",
+      "cleanedChars": 110280,
+      "fullA": {
+        "products": 52,
+        "costUsd": 0.0076311
+      },
+      "fullB": {
+        "products": 30,
+        "costUsd": 0.0113844,
+        "lostVsA": [
+          "Nuts",
+          "Candy",
+          "Peppermints",
+          "Gummy worms",
+          "Gummy bears",
+          "Almonds",
+          "Cashews",
+          "Walnuts",
+          "Pepitas",
+          "Chia seeds",
+          "Sesame sticks",
+          "Okra chips",
+          "Plantain chips",
+          "Dried mango slices",
+          "Dried coconut chunks",
+          "Raisins"
+        ]
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 24,
+          "lostVsA": [
+            "Baking ingredients",
+            "Cereal products",
+            "Hard and pressed candies",
+            "Peppermints",
+            "Almonds",
+            "Cashews",
+            "Pepitas",
+            "Chia seeds",
+            "Flax seeds",
+            "Sesame sticks",
+            "Okra chips",
+            "Plantain chips",
+            "Raisins"
+          ],
+          "keptFraction": 0.14578492213200653,
+          "costUsd": 0.0019402,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 25,
+          "lostVsA": [
+            "Baking ingredients",
+            "Cereal products",
+            "Peppermints",
+            "Better-for-you chocolate",
+            "Almonds",
+            "Cashews",
+            "Pepitas",
+            "Chia seeds",
+            "Flax seeds",
+            "Sesame sticks",
+            "Okra chips",
+            "Plantain chips",
+            "Raisins"
+          ],
+          "keptFraction": 0.29156073156729273,
+          "costUsd": 0.0027513999999999998,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": false,
+          "products": 26,
+          "lostVsA": [
+            "Candy",
+            "Cereal products",
+            "Almonds",
+            "Cashews",
+            "Pepitas",
+            "Chia seeds",
+            "Flax seeds",
+            "Sesame sticks",
+            "Okra chips",
+            "Plantain chips"
+          ],
+          "keptFraction": 0.5832125901017888,
+          "costUsd": 0.0073690000000000005,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 792672,
+      "domain": "flavorchem.store",
+      "cleanedChars": 176447,
+      "fullA": {
+        "products": 18,
+        "costUsd": 0.01482278
+      },
+      "fullB": {
+        "products": 31,
+        "costUsd": 0.0157806,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 8,
+          "lostVsA": [
+            "natural flavor extracts",
+            "vanilla bean paste",
+            "powder seasonings",
+            "bath bombs",
+            "seasoning mixes"
+          ],
+          "keptFraction": 0.08974759022131952,
+          "costUsd": 0.0017238,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 8,
+          "lostVsA": [
+            "vanilla extracts",
+            "vanilla powders",
+            "vanilla bean paste",
+            "bath bombs",
+            "seasoning mixes"
+          ],
+          "keptFraction": 0.10056109973278264,
+          "costUsd": 0.0008659399999999999,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 5,
+          "lostVsA": [
+            "natural flavor extracts",
+            "powdered flavor extracts",
+            "spray dried flavor extracts",
+            "vanilla extracts",
+            "vanilla powders",
+            "vanilla bean paste",
+            "powder seasonings",
+            "bath bombs",
+            "seasoning mixes"
+          ],
+          "keptFraction": 0.10056109973278264,
+          "costUsd": 0.00051194,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 872055,
+      "domain": "exportsfromeurope.com",
+      "cleanedChars": 621047,
+      "fullA": {
+        "products": 0,
+        "costUsd": 0.024343920000000005
+      },
+      "fullB": {
+        "products": 0,
+        "costUsd": 0.02180018,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 4,
+          "lostVsA": [],
+          "keptFraction": 0.02581327964171168,
+          "costUsd": 0.00086402,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 4,
+          "lostVsA": [],
+          "keptFraction": 0.051621719293490534,
+          "costUsd": 0.0008906199999999998,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.10324827857691389,
+          "costUsd": 0.0014380999999999999,
+          "withinFloor": true
+        }
+      }
+    },
+    {
+      "id": 909536,
+      "domain": "kookainc.com",
+      "cleanedChars": 165619,
+      "fullA": {
+        "products": 15,
+        "costUsd": 0.0135224
+      },
+      "fullB": {
+        "products": 20,
+        "costUsd": 0.01391688,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 5,
+          "lostVsA": [
+            "Cannabis pre-rolls",
+            "Cannabis concentrates",
+            "Cannabis tinctures",
+            "Cannabis dog treats",
+            "Topical relief lotion",
+            "Topical roll-on"
+          ],
+          "keptFraction": 0.0966963735081079,
+          "costUsd": 0.0015588,
+          "withinFloor": false
+        },
+        "32000": {
+          "skipped": false,
+          "products": 11,
+          "lostVsA": [
+            "THC disposable vapes",
+            "Cannabis concentrates",
+            "Cannabis tinctures",
+            "Topical relief lotion",
+            "Topical roll-on"
+          ],
+          "keptFraction": 0.19344111636455977,
+          "costUsd": 0.0024342,
+          "withinFloor": false
+        },
+        "64000": {
+          "skipped": false,
+          "products": 11,
+          "lostVsA": [
+            "Cannabis concentrates",
+            "Cannabis tinctures",
+            "Topical relief lotion",
+            "Topical roll-on"
+          ],
+          "keptFraction": 0.3867975863695176,
+          "costUsd": 0.006284,
+          "withinFloor": false
+        }
+      }
+    },
+    {
+      "id": 1161827,
+      "domain": "whitelabelpartners.com",
+      "cleanedChars": 364347,
+      "fullA": {
+        "products": 0,
+        "costUsd": 0.018683
+      },
+      "fullB": {
+        "products": 0,
+        "costUsd": 0.01839828,
+        "lostVsA": []
+      },
+      "budgets": {
+        "16000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.04392191781198385,
+          "costUsd": 0.0008732000000000001,
+          "withinFloor": true
+        },
+        "32000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.0878245981427586,
+          "costUsd": 0.0013794,
+          "withinFloor": true
+        },
+        "64000": {
+          "skipped": false,
+          "products": 0,
+          "lostVsA": [],
+          "keptFraction": 0.14384414342366705,
+          "costUsd": 0.00213646,
+          "withinFloor": true
+        }
+      }
+    }
+  ],
+  "summary": {
+    "16000": {
+      "sitesOverBudget": 27,
+      "sitesBeyondFloor": 15,
+      "productsLost": 307,
+      "productsInFull": 862,
+      "costUsd": 0.04021921999999999,
+      "fullReadCostUsd": 0.38599972,
+      "verdict": "stays_off"
+    },
+    "32000": {
+      "sitesOverBudget": 25,
+      "sitesBeyondFloor": 16,
+      "productsLost": 305,
+      "productsInFull": 837,
+      "costUsd": 0.04905046000000001,
+      "fullReadCostUsd": 0.38599972,
+      "verdict": "stays_off"
+    },
+    "64000": {
+      "sitesOverBudget": 19,
+      "sitesBeyondFloor": 13,
+      "productsLost": 199,
+      "productsInFull": 664,
+      "costUsd": 0.12237764000000002,
+      "fullReadCostUsd": 0.38599972,
+      "verdict": "stays_off"
+    }
+  }
+}
