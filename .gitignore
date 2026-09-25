@@ -4,5 +4,5 @@ dist/
 .claude/
 .playwright-mcp/
 .model-cache/
-artifacts/tagging.sqlite
+artifacts/tagging.sqlite*
 .env.local
