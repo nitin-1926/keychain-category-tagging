@@ -1,4 +1,10 @@
-// Steps 7 and 8 (ARCHITECTURE.md): batched judge with a shared cached prefix, then code validation.
+// STEPS 7 and 8 (ARCHITECTURE.md section 3): the judge decides, in batches that share one prefix,
+// then code validates what it said. Steps 7 and 8 live in one file because they are one loop: no
+// verdict leaves judge() without having been checked.
+// Called by: pipeline/tag.ts. Calls: llm/client.ts complete() once per batch, text/normalize.ts
+// for the quote guard. Next step: pipeline/policy.ts, on the verdicts this returns.
+// Order below: the output schema, evidenceBlocks() (what the judge is shown), batches() (how it is
+// cut up), then judge() which runs the calls and applies the guards.
 
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
@@ -48,6 +54,13 @@ export function evidenceBlocks(card: Card, chunks: Chunk[], headChars = 2_000): 
   const keep = new Set<number>();
   for (const c of chunks) if (c.charStart < headChars) keep.add(c.index);
   const norm = chunks.map((c) => normalize(c.text));
+  // Deliberately stricter than the guard that admitted the quote in step 5: a plain substring,
+  // no fuzzy tier. It means 12 of 1,235 card quotes (a fuzzy match, or a quote straddling a
+  // heading, which always starts a new chunk) contribute no block of their own. Using findQuote
+  // here instead was built and run live over all 30 ($0.18): quote_not_found fell 2 -> 1, but
+  // judge_rejected rose 60 -> 66 and F1 fell 86.0% -> 85.1%. The extra chunks give the judge more
+  // context and a stricter reading of it - refresco gained a group, interamerican lost five - so
+  // the tight bundle stays. The site head is always included, so no quote is left contextless.
   for (const q of quotes) {
     const i = norm.findIndex((t) => t.includes(q));
     if (i >= 0) keep.add(chunks[i]!.index);

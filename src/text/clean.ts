@@ -1,4 +1,7 @@
-// Step 1 (ARCHITECTURE.md): deterministic, per-line cleaning. No judgement about content.
+// STEP 1 of the pipeline (ARCHITECTURE.md section 3): deterministic, per-line cleaning.
+// Called by: pipeline/tag.ts (first thing it does) and the cli `clean-stats` command.
+// Calls: nothing. Next step: text/chunk.ts, on the `lines` this returns.
+// No judgement about content happens here - only rules that can be named exactly.
 
 export type CleanResult = {
   lines: string[];

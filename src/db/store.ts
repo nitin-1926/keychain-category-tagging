@@ -2,8 +2,13 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-// artifacts/tagging.sqlite: everything derived. llm_cache is both the runtime cache and the
-// replay source (plan). Tables are added here when the unit that uses them lands.
+// artifacts/tagging.sqlite: everything this service derives. Three tables and nothing else.
+//   llm_cache  every model request and response, keyed by a hash of the request. Written by
+//              llm/client.ts, exported to artifacts/replay/ by llm/replay.ts.
+//   results    one row per (manufacturer, pipeline version). Written by pipeline/tag.ts at the
+//              end of every run, read by it at the start, and read by eval/report.ts and the API.
+//   jobs       the API's queue. Written by api/jobs.ts.
+// Called by: cli.ts and api/server.ts at startup, into `deps.store`.
 
 export type CacheRow = {
   key: string;

@@ -1,4 +1,8 @@
-// Step 6 (ARCHITECTURE.md): card phrases -> hybrid retrieval -> union -> sibling expansion -> cap.
+// STEP 6 (ARCHITECTURE.md section 3): card phrases -> hybrid retrieval -> union -> sibling
+// expansion -> cap. No model call and no network: this is the cheap part that decides what the
+// expensive part is allowed to consider.
+// Called by: pipeline/tag.ts (and the cli `shortlist` command). Calls: index/taxonomy.ts.
+// Next step: pipeline/judge.ts, on the candidates this returns.
 
 import { config } from '../config.js';
 import { baseName, type Hit, type TaxonomyIndex } from '../index/taxonomy.js';

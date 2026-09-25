@@ -2,8 +2,10 @@ import { env, pipeline, type FeatureExtractionPipeline } from '@huggingface/tran
 import { existsSync } from 'node:fs';
 import { config } from '../config.js';
 
-// Local multilingual embeddings (Q10). Callers add the e5 prefixes: 'passage: ' for
-// categories; 'query: ' for card phrases.
+// Local multilingual embeddings: a 118 MB ONNX model in .model-cache/, no API and no cost.
+// Called by: index/taxonomy.ts (every category once at build time, every phrase at query time)
+// and eval/compare.ts (to ask whether a missed category was on the card at all).
+// Callers add the e5 prefixes themselves: 'passage: ' for categories, 'query: ' for card phrases.
 env.cacheDir = '.model-cache';
 env.allowRemoteModels = process.env.EMBED_OFFLINE !== '1';
 

@@ -1,4 +1,7 @@
 // Table-backed in-process job runner: one loop, N workers per job, pending rows resumed on start.
+// Called by: api/server.ts (created once) and api/routes.ts (enqueue, get).
+// Calls: pipeline/tag.ts, once per manufacturer in the job, and db/store.ts to persist progress
+// after every item - so a restart resumes instead of starting over.
 
 import { randomUUID } from 'node:crypto';
 import type { JobRow } from '../db/store.js';

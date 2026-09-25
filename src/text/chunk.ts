@@ -1,5 +1,8 @@
-// Step 2 (ARCHITECTURE.md): cleaned lines -> ~1,000-char chunks. A heading starts a new chunk;
-// a single oversize line is split at sentence ends. Chunks keep site order.
+// STEP 2 (ARCHITECTURE.md section 3): cleaned lines -> ~1,000-char chunks. A heading starts a new
+// chunk; a single oversize line is split at sentence ends. Chunks keep site order.
+// Called by: pipeline/tag.ts, right after text/clean.ts.
+// Its output feeds two places: pipeline/profile.ts groups chunks into model-sized windows (step 3),
+// and pipeline/judge.ts picks individual chunks as evidence (step 7).
 
 export type Chunk = { index: number; text: string; charStart: number; heading: string };
 

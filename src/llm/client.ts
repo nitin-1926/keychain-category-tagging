@@ -6,7 +6,14 @@ import { config } from '../config.js';
 import type { Store } from '../db/store.js';
 import { addUsage, costUsd, Usage, ZERO_USAGE } from './pricing.js';
 
-// The one deliberate seam: every model call goes through complete().
+// The one deliberate seam: every model call in the service goes through complete().
+// Called by: pipeline/profile.ts (steps 3 and 5) and pipeline/judge.ts (step 7). Nothing else in
+// the pipeline may talk to a model, which is what makes the cache, the cost accounting and the
+// no-key replay mode possible at all.
+// Calls: the OpenAI Responses API through `Transport`, and db/store.ts for the cache.
+//
+// Read in this order: requestKey() (what makes two calls the same call), openaiTransport() (the
+// only network code), then createClient() -> complete(), which is the decision tree below.
 // live   -> llm_cache first, then the transport (OpenAI Responses API)
 // replay -> llm_cache only; a miss is a ReplayMissError, never a billed call
 // stub   -> canned objects registered by tests

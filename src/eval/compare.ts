@@ -1,4 +1,7 @@
-// Eval, pure part: pipeline result vs the reference set, per sibling group, with a cause for every miss.
+// Eval, pure part: one manufacturer's result against the reference set, per sibling group, with a
+// cause for every miss. Nothing here runs in the request path.
+// Called by: eval/report.ts, once per manufacturer. Calls: index/embed.ts (only to answer "was this
+// category on the card at all?") and index/taxonomy.ts baseName() for grouping.
 
 import { config } from '../config.js';
 import { dot, embed } from '../index/embed.js';

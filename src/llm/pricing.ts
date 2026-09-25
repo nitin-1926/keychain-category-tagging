@@ -1,3 +1,7 @@
+// Cost is never estimated: it is tokens x price, priced here from the published table.
+// Called by: llm/client.ts on every live call (the result is stored with the cached response, so a
+// replayed run reports the cost the call actually had); eval/report.ts sums the stored figures.
+//
 // $ per 1M tokens, Standard tier, short context. gpt-5.6 rows read 2026-09-22, gpt-6 rows read 2026-09-24,
 // both from https://developers.openai.com/api/docs/pricing.
 // Input price applies to uncached input tokens. The gpt-6 page also lists a "cache writes" rate

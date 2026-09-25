@@ -1,4 +1,11 @@
-// Steps 3 and 5 (ARCHITECTURE.md): read the site in windows, merge into the card, verify quotes.
+// STEPS 3 and 5 (ARCHITECTURE.md section 3): read the whole site in windows, merge into the card,
+// verify every quote. The card is what the rest of the pipeline works from - the site text is not
+// looked at again except as evidence for the judge.
+// Called by: pipeline/tag.ts (and the cli `profile` command, to print a card on its own).
+// Calls: llm/client.ts complete() once per window plus one merge call; text/normalize.ts for the
+// quote guard. Next step: pipeline/shortlist.ts, on the card this returns.
+// Order below: the Card schema (what the model must return), windows(), pool(), verifyCard() (the
+// guard), then profile() which runs the three in sequence.
 
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';

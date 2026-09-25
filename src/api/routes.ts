@@ -1,3 +1,8 @@
+// The HTTP surface (contract in the README and ARCHITECTURE.md section 7). One handler per route,
+// no logic of its own: it validates the request, then either reads a stored row, calls
+// pipeline/tag.ts directly (?wait=true), or hands the work to api/jobs.ts.
+// Called by: api/server.ts. Calls: pipeline/tag.ts, api/jobs.ts, api/serialize.ts.
+
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { fromRow, tag, type Deps } from '../pipeline/tag.js';

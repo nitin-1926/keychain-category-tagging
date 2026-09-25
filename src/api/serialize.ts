@@ -1,4 +1,6 @@
-// The one public shape of a result, shared by the API and `cli tag --json` (contract in ARCHITECTURE.md section 7).
+// The one public shape of a result, shared by every route and by `cli tag --json`, so the contract
+// cannot drift between them (README "Service contract", ARCHITECTURE.md section 7).
+// Called by: api/routes.ts and cli.ts. Calls: nothing - it is a pure rename of TagResult.
 
 import type { TagResult } from '../pipeline/tag.js';
 

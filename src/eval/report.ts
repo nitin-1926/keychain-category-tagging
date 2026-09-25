@@ -1,5 +1,10 @@
-// Eval: stored results scored against artifacts/reference.json (built once from Jev + arbiter, see
-// ARCHITECTURE.md section 8), with a cause for every miss, a calibration table and the cost table.
+// Eval: every stored result scored against artifacts/reference.json (built once from Jev + arbiter,
+// see ARCHITECTURE.md section 8), with a cause for every miss, a calibration table and the cost
+// table. Makes no model calls, so it is free and repeatable.
+// Called by: cli.ts `report`, and nothing else - the pipeline never imports this file.
+// Calls: db/store.ts (stored rows), eval/compare.ts (the per-manufacturer comparison).
+// Order: compareAll -> calibration + costTable -> buildReport -> writeReport (artifacts/report.md
+// and artifacts/calibration.json).
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { config } from '../config.js';

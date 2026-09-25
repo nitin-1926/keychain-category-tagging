@@ -1,3 +1,8 @@
+// The bridge between the live cache and the committed evidence.
+// Called by: cli.ts - `cache export` after a live run, and an import on every command so a fresh
+// clone can answer every model call from artifacts/replay/ with no API key.
+// Calls: llm/client.ts requestKey(), to recognise which rows the current pipeline would ask for.
+
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { config } from '../config.js';

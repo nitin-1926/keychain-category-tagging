@@ -1,5 +1,8 @@
-// One normaliser for every quote check (ARCHITECTURE.md step 8, plan U2).
-// Applied to both the model's quote and the evidence it was given.
+// The quote guard, shared by both places the model is asked to copy text from the site.
+// Called by: pipeline/profile.ts verifyCard() (step 5, drops a product whose quote is not real)
+// and pipeline/judge.ts (step 8, flips `applies` to false when the quote is not real). Also by
+// pipeline/policy.ts and index/taxonomy.ts, for name comparison rather than quote checking.
+// Applied to both sides: the model's quote and the evidence it was given.
 
 const ENTITIES: Record<string, string> = {
   '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&apos;': "'", '&nbsp;': ' ',

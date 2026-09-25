@@ -14,7 +14,13 @@ import { tag, type TagResult } from './pipeline/tag.js';
 import { chunk } from './text/chunk.js';
 import { clean } from './text/clean.js';
 
-// Usage: npm run cli -- <command> [args]
+// ENTRY POINT 1 of 2 (the other is api/server.ts). Usage: npm run cli -- <command> [args].
+// Every command is one entry in the `commands` map at the bottom; the file reads top to bottom as
+// helpers first, commands second, dispatch last (the three lines under the map).
+// deps() is what every command that touches the pipeline builds first: the read-only dataset, the
+// artifacts store (with the committed replay evidence loaded into it), the LLM client and the
+// taxonomy index. From there, `tag` calls pipeline/tag.ts and the rest follows the flow in the
+// README's "How to read the code".
 const [cmd, ...args] = process.argv.slice(2);
 const src = openSource(config.SOURCE_DB);
 

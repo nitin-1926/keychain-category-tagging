@@ -1,4 +1,8 @@
-// Step 9 (ARCHITECTURE.md): storage rule, cutoff, entity gate, status. Code only, no model.
+// STEP 9 (ARCHITECTURE.md section 3): storage rule, entity gate, cutoff, status. Code only, no
+// model - these are the decisions a model guesses badly at and a rule can explain.
+// Called by: pipeline/tag.ts, on the verdicts from pipeline/judge.ts. Calls: index/taxonomy.ts
+// baseName() to find a group's unqualified category. Next step: the result row.
+// Order below: the storage vocabulary, then applyPolicy(), which runs the three rules in order.
 
 import { baseName } from '../index/taxonomy.js';
 import { normalize } from '../text/normalize.js';

@@ -1,10 +1,15 @@
+// The provided dataset, read-only: 30 manufacturers with their scraped markdown, 1,424 categories.
+// Called by: cli.ts and api/server.ts at startup, into `deps.src`. pipeline/tag.ts reads one
+// manufacturer from it; index/taxonomy.ts reads every category from it.
+// Calls: nothing. Writes: nothing, ever - everything derived goes to artifacts/ (see db/store.ts).
+
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 
 export type Category = { id: number; name: string; definition: string | null };
 export type Manufacturer = { id: number; name: string; domain: string; markdown: string };
 
-// The provided SQLite is never written to (AGENTS.md); derived data goes to artifacts/.
+// The provided SQLite is never written to: opened read-only, derived data goes to artifacts/.
 export function openSource(path: string) {
   const db = new Database(path, { readonly: true, fileMustExist: true });
 
