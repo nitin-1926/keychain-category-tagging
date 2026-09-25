@@ -1,10 +1,12 @@
 {
-  "generatedAt": "2026-09-24T19:07:50.765Z",
+  "generatedAt": "2026-09-25T19:33:26.827Z",
+  "method": "Shortlist only, no model calls: each stored card is retrieved against the committed taxonomy index in all three QUERY_MODE settings, and scored by how many of the reference groups never reach the judge. Regenerated against the current stored cards.",
+  "manufacturers": 30,
   "modes": {
     "name": {
       "referenceGroups": 391,
       "notInShortlist": 22,
-      "meanShortlist": 162.12,
+      "meanShortlist": 140,
       "misses": [
         "innomarkinc.com: Functional Beverage",
         "interamericanproducts.com: Baking Ingredients",
@@ -33,7 +35,7 @@
     "name_quote": {
       "referenceGroups": 391,
       "notInShortlist": 22,
-      "meanShortlist": 153.32,
+      "meanShortlist": 132.67,
       "misses": [
         "nellsonllc.com: Chocolate / Candy Melts",
         "krierfoods.com: Ready To Drink Coffee",
@@ -62,7 +64,7 @@
     "conditional": {
       "referenceGroups": 391,
       "notInShortlist": 25,
-      "meanShortlist": 155.92,
+      "meanShortlist": 134.83,
       "misses": [
         "krierfoods.com: Ready To Drink Coffee",
         "krierfoods.com: Ready To Drink Tea",

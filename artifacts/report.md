@@ -1,6 +1,6 @@
 # Eval report
 
-Generated 2026-09-25T14:30:44.524Z. Pipeline: gpt-6-luna, prompts profile v2 / judge v2, query mode name, cutoff 0.6. Reference: artifacts/reference.json (2026-09-24): Jev (jev-latest) over all 1,424 categories per manufacturer with the gpt-6-luna full-read card as state, positives at >= 0.5, collapsed to sibling groups with the storage policy; every disagreement with the pipeline settled by gpt-6-sol (416 verdicts, 2026-09-24); marketplaces and investors have an empty reference by Keychain's answer. Groups are keyed by category base name. Every number comes from rows in artifacts/tagging.sqlite; rerun `npm run cli -- report` to regenerate.
+Generated 2026-09-25T19:35:20.712Z. Pipeline: gpt-6-luna, prompts profile v2 / judge v2, query mode name, cutoff 0.6. Reference: artifacts/reference.json (2026-09-24): Jev (jev-latest) over all 1,424 categories per manufacturer with the gpt-6-luna full-read card as state, positives at >= 0.5, collapsed to sibling groups with the storage policy; every disagreement with the pipeline settled by gpt-6-sol (416 verdicts, 2026-09-24); marketplaces and investors have an empty reference by Keychain's answer. Groups are keyed by category base name. Every number comes from rows in artifacts/tagging.sqlite; rerun `npm run cli -- report` to regenerate.
 
 ## Accuracy (per sibling group)
 

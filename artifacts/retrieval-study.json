@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-09-26",
+  "question": "Retrieval loses 18 of the 391 reference groups before the judge ever sees them. Can that be bought back, and is it worth buying?",
+  "method": "Two sweeps are offline and free: every stored card is retrieved against a rebuilt taxonomy index and scored by how many reference groups never reach the shortlist. The two settings that looked worth it were then run live over all 30 manufacturers and scored end to end against artifacts/reference.json.",
+  "baseline": {
+    "definitionChars": 1000,
+    "retrievalK": 8,
+    "shortlistCap": "max(120, 3 x card phrases)",
+    "notInShortlist": 22,
+    "meanShortlist": 140,
+    "tp": 307,
+    "fp": 16,
+    "fn": 84,
+    "precision": 0.95,
+    "recall": 0.785,
+    "f1": 0.86,
+    "costUsd30": 0.5105
+  },
+  "sweepDefinitionChars": {
+    "what": "How much of each category definition the dense side embeds. Every definition in this taxonomy is longer than 1,000 chars (1,206 to 2,894, mean 1,702), so the bound always bites. BM25 always reads the whole definition.",
+    "notInShortlistBy": { "0": 25, "200": 27, "400": 29, "600": 26, "800": 29, "1000": 22, "1500": 20, "whole": 25 },
+    "verdict": "Kept at 1,000. There is no trend to follow: neighbouring settings swing by nine groups of 391, so the 1,500 that measured best is one run of a coin on 30 manufacturers, and every change here rebuilds every vector and voids the committed replay evidence."
+  },
+  "sweepDepthAndCap": {
+    "what": "How many categories each card phrase retrieves (k) and how many survive the cap. Measured as [k, cap] -> groups missed / mean shortlist.",
+    "results": [
+      { "k": 8, "cap": "max(120, 3x)", "notInShortlist": 22, "meanShortlist": 140 },
+      { "k": 12, "cap": "max(120, 3x)", "notInShortlist": 23, "meanShortlist": 143 },
+      { "k": 16, "cap": "max(120, 3x)", "notInShortlist": 24, "meanShortlist": 144 },
+      { "k": 24, "cap": "max(120, 3x)", "notInShortlist": 24, "meanShortlist": 144 },
+      { "k": 8, "cap": 400, "notInShortlist": 14, "meanShortlist": 187 },
+      { "k": 12, "cap": 400, "notInShortlist": 17, "meanShortlist": 243 },
+      { "k": 16, "cap": 400, "notInShortlist": 12, "meanShortlist": 282 },
+      { "k": 8, "cap": 600, "notInShortlist": 11, "meanShortlist": 202 },
+      { "k": 16, "cap": 600, "notInShortlist": 6, "meanShortlist": 317 },
+      { "k": 16, "cap": 1000, "notInShortlist": 3, "meanShortlist": 339 }
+    ],
+    "finding": "Raising k alone changes nothing, because the cap binds: more candidates compete for the same slots and whole sibling groups are skipped. The cap is the lever. Retrieval recall can be bought almost entirely - 22 misses down to 3 - by paying for a shortlist two to three times larger, which the judge stage is priced by."
+  },
+  "liveRuns": [
+    {
+      "change": "k = 16, shortlistCap = 600 (retrieval misses 22 -> 6 offline)",
+      "tp": 320,
+      "fp": 36,
+      "fn": 71,
+      "precision": 0.899,
+      "recall": 0.818,
+      "f1": 0.857,
+      "notInShortlist": 4,
+      "judgeRejected": 63,
+      "meanShortlist": 317,
+      "meanJudgeBatches": 11.1,
+      "costUsd30": 0.7954,
+      "verdict": "Rejected. It did exactly what the offline sweep promised - not_in_shortlist 18 -> 4, and 13 of those became true positives - but 20 new false positives came with them, precision fell 95.0% -> 89.9%, F1 fell 86.0% -> 85.7%, and the run cost 56% more ($510 -> $795 per 30,000). Keychain scores by a human review pass, where a wrong tag costs reviewer time."
+    },
+    {
+      "change": "evidenceBlocks uses findQuote, the same matcher that admitted the quote, instead of a plain substring (12 of 1,235 card quotes currently contribute no evidence block)",
+      "tp": 302,
+      "fp": 17,
+      "fn": 89,
+      "precision": 0.947,
+      "recall": 0.772,
+      "f1": 0.851,
+      "quoteNotFound": 1,
+      "judgeRejected": 66,
+      "costUsd30": 0.5097,
+      "verdict": "Rejected. quote_not_found fell 2 -> 1 as intended, but judge_rejected rose 60 -> 66: giving the judge more of the site made it read the site more strictly. refresco gained a group, interamerican lost five, F1 86.0% -> 85.1%."
+    }
+  ],
+  "conclusion": "Three independent attempts to raise recall - a looser judge prompt (v3, see the README), more evidence per quote, and deeper retrieval - each bought recall and paid for it in precision, leaving F1 flat inside the run-to-run noise floor and, in the retrieval case, costing 56% more. The pipeline is on its precision/recall frontier; moving along the frontier is easy and moving the frontier is not. The remaining headroom is 60 of the 84 misses, where the judge reads a definition more narrowly than the arbiter did - a judge problem, not a retrieval one."
+}
