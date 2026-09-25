@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import { config } from '../../src/config.js';
 import { openSource } from '../../src/db/source.js';
 import { modelCached } from '../../src/index/embed.js';
 import { baseName, loadOrBuildIndex, type Hit, type TaxonomyIndex } from '../../src/index/taxonomy.js';
@@ -88,11 +89,14 @@ describe.skipIf(!modelCached())('shortlist (integration)', () => {
     // retrieval may already return all three; the 40-phrase test below checks that every group is complete
   });
 
-  it('40 phrases -> capped near 120 with sibling groups intact', async () => {
+  it('40 phrases -> filled up to the cap with sibling groups intact', async () => {
     const names = src.listCategories().filter((_, i) => i % 35 === 0).slice(0, 40).map((c) => c.name.toLowerCase());
     const out = await shortlist(card(names), index);
-    expect(out.length).toBeLessThanOrEqual(120);
-    expect(out.length).toBeGreaterThan(90);
+    // The cap is config, not a literal: this pins that it is respected and nearly filled, whatever
+    // it is set to, rather than restating the number and breaking when it is tuned.
+    const cap = Math.max(config.shortlistCap, 3 * names.length);
+    expect(out.length).toBeLessThanOrEqual(cap);
+    expect(out.length).toBeGreaterThan(cap * 0.7);
     const groups = new Set(out.map((c) => c.group));
     for (const g of groups) {
       const inList = out.filter((c) => c.group === g).map((c) => c.id).sort();

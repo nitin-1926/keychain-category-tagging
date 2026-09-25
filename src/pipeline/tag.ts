@@ -1,4 +1,9 @@
-// One manufacturer end to end: clean -> chunk -> (select) -> profile -> shortlist -> judge -> policy -> store.
+// THE PIPELINE. One manufacturer, end to end. Start reading here.
+//   clean (step 1) -> chunk (2) -> profile (3 and 5, two model calls) -> shortlist (6)
+//   -> judge (7 and 8, one model call per batch) -> policy (9) -> store (10)
+// Called by: cli.ts `tag` / `tag-all`, and api/routes.ts / api/jobs.ts. Everything the pipeline
+// needs arrives in `deps`, so nothing here reaches for a global or opens a connection of its own.
+// `versions()` and `resultKey()` sit above tag() because they decide whether any of it runs.
 
 import { createHash } from 'node:crypto';
 import { config } from '../config.js';
@@ -45,6 +50,8 @@ export function versions(taxonomyHash: string): Record<string, string> {
     modelPipeline: config.MODEL_PIPELINE,
     embedModel: config.EMBED_MODEL,
     queryMode: config.QUERY_MODE,
+    retrievalK: String(config.retrievalK),
+    shortlistCap: String(config.shortlistCap),
     cutoff: String(config.CUTOFF),
     nonManufacturerPolicy: config.NON_MANUFACTURER_POLICY,
     taxonomyHash,
@@ -111,18 +118,23 @@ export function tag(deps: Deps, manufacturerId: number, opts: { force?: boolean 
 
 async function runTag(deps: Deps, manufacturerId: number, opts: { force?: boolean }): Promise<TagResult> {
   const t0 = Date.now();
+  // Input: one row of the provided dataset - name, domain, and the scraped site as markdown.
   const m = deps.src.getManufacturer(manufacturerId);
   if (!m) throw new Error(`unknown manufacturer ${manufacturerId}`);
   const v = versions(deps.index.taxonomyHash);
+
+  // STEP 1: clean (text/clean.ts). String rules only, no model. ~17.8M chars become ~5.9M.
   const cleaned = clean(m.markdown);
   const key = resultKey(manufacturerId, cleaned.text, v);
 
+  // Nothing below runs if this exact site text has already been tagged by this exact pipeline.
   if (!opts.force) {
     const row = deps.store.results.get(key);
     // A stored error is a record of a failed attempt, not an answer: retry instead of serving it.
     if (row && row.status !== 'error') return fromRow(row);
   }
 
+  // STEP 2: chunk (text/chunk.ts). Used twice below: as windows in step 3, as evidence in step 7.
   const chunks = chunk(cleaned.lines, config.chunkChars);
   const result: TagResult = {
     manufacturerId,
@@ -146,6 +158,9 @@ async function runTag(deps: Deps, manufacturerId: number, opts: { force?: boolea
       result.status = 'insufficient_content';
     } else {
       const tagStr = String(manufacturerId);
+
+      // STEPS 3 and 5: read every window, merge into the card, verify its quotes (pipeline/profile.ts).
+      // Model calls 1..n. Everything after this works from the card, not from the site text.
       const p = await profile(deps.llm, chunks, tagStr);
       result.card = p.card;
       result.entityType = p.card.entity_type;
@@ -154,11 +169,15 @@ async function runTag(deps: Deps, manufacturerId: number, opts: { force?: boolea
       result.evidence.windows = p.windows;
       result.evidence.quotes = p.quotes;
 
+      // STEP 6: which categories are even worth asking about (pipeline/shortlist.ts). Local, free.
       const candidates = await shortlist(p.card, deps.index);
       result.evidence.shortlist = candidates.length;
+
+      // STEP 7 input: the slice of the site the judge gets to see (pipeline/judge.ts).
       const evidence = evidenceBlocks(p.card, chunks);
       result.evidence.judgeEvidenceChars = evidence.length;
 
+      // STEPS 7 and 8: judge each candidate in batches, then validate every verdict in code.
       const j = candidates.length ? await judge(deps.llm, p.card, evidence, candidates, tagStr) : { verdicts: [], batches: 0, unknownIds: 0, repeatedIds: 0, usage: ZERO_USAGE, costUsd: 0 };
       result.usage.judge = j.usage;
       result.costUsd += j.costUsd;
@@ -166,6 +185,7 @@ async function runTag(deps: Deps, manufacturerId: number, opts: { force?: boolea
       result.evidence.unknownIds = j.unknownIds;
       result.evidence.repeatedIds = j.repeatedIds;
 
+      // STEP 9: the rules code owns, not the model (pipeline/policy.ts). Decides the final status.
       const policy = applyPolicy(j.verdicts, p.card, { cutoff: config.CUTOFF, nonManufacturerPolicy: config.NON_MANUFACTURER_POLICY });
       result.status = policy.status;
       result.accepted = policy.accepted;
@@ -175,6 +195,7 @@ async function runTag(deps: Deps, manufacturerId: number, opts: { force?: boolea
     result.status = 'error';
     result.error = e instanceof Error ? `${e.constructor.name}: ${e.message}` : String(e);
   }
+  // STEP 10: one row, always - a failure is stored as `error` with what it cost, never dropped.
   result.usage.total = addUsage(result.usage.profile, result.usage.judge);
   result.durationMs = Date.now() - t0;
   deps.store.results.put(toRow(result));

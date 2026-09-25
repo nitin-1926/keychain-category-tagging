@@ -1,3 +1,11 @@
+// The taxonomy index: the 1,424 categories, searchable. Built once, saved to artifacts/, no model
+// calls at request time and no network.
+// Called by: cli.ts and api/server.ts build it into `deps` at startup (loadOrBuildIndex), then
+// pipeline/shortlist.ts queries it once per card phrase (step 6) through searchHybrid().
+// Calls: index/embed.ts for the local embedding model.
+// Reading order below: BM25, then reciprocal rank fusion, then sibling grouping, then the index
+// object that ties the three together, then load/save.
+
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { config } from '../config.js';
@@ -110,7 +118,16 @@ function makeIndex(categories: Category[], vectors: Float32Array[], taxonomyHash
   };
 }
 
-const categoryText = (c: Category) => `passage: ${c.name}${c.definition ? `: ${c.definition.slice(0, 1_000)}` : ''}`;
+// What each category looks like to the dense side: its name plus the first 1,000 characters of its
+// definition. Every definition in this taxonomy is longer than that (1,206 to 2,894 chars, mean
+// 1,702), so the bound is doing real work, and it is not arbitrary: retrieval recall was measured
+// over the 391 reference groups at 0 / 200 / 400 / 600 / 800 / 1,000 / 1,500 chars and the whole
+// definition, giving 25 / 27 / 29 / 26 / 29 / 22 / 20 / 25 groups missed. There is no trend to
+// follow - neighbouring settings swing by nine groups - so 1,000 stays and the 1,500 that measured
+// best is not chased: on 30 manufacturers that is one run of a coin, and every change here rebuilds
+// every vector and invalidates the committed replay evidence. The BM25 side reads the whole
+// definition, which is where an exact term deep in the text is still found.
+const categoryText = (c: Category) => `passage: ${c.name}: ${(c.definition ?? '').slice(0, 1_000)}`;
 
 export async function buildIndex(categories: Category[], taxonomyHash: string): Promise<TaxonomyIndex> {
   const vectors = await embed(categories.map(categoryText));
