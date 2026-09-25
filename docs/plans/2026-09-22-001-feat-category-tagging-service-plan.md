@@ -8,6 +8,11 @@ deepened: 2026-09-22
 
 # feat: Category Tagging Service
 
+> Historical: this is the plan as approved on 2026-09-22, kept as the record of what was agreed
+> before any code. Three things in it were later built, measured and removed — the chunk-selection
+> lever (`cli -- select`), the Jev reference run (`cli -- jev`) and the standalone `cli -- judge`
+> command — so those commands do not exist in `src/cli.ts`. See AI_LOG.md entries 15 and 16.
+
 ## Summary
 
 A Node + TypeScript service that tags one manufacturer at a time: clean the scraped site, read all of it with luna at low effort in windows, merge into a profile card, run batched judge calls against a hybrid-retrieved shortlist, validate in code, and store the result with quotes, confidence and measured cost. Beside it: a second full read of every site (the noise floor for the selection lever), a Jev run over all 1,424 categories, an arbiter for mismatches, and a report that also decides whether the selection lever may be enabled and sets the confidence cutoff from data. Four phases; each ends with a number you can check.

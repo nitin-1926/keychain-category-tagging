@@ -107,7 +107,7 @@ Rules, applied per line:
 - drop a line if its normalised form (lowercased, whitespace collapsed) has already been seen in this site
 - drop lines that are only punctuation or one character
 
-Why line-level dedupe works so well here: every page repeats the same menu and footer, so the first page keeps them and every later page loses them. Measured: 17.8M chars become 5.8M (32%). Krier Foods 177K to 59K; Monbana 528K to 84K; needl.co 2.1M to 733K.
+Why line-level dedupe works so well here: every page repeats the same menu and footer, so the first page keeps them and every later page loses them. Measured (`npm run cli -- clean-stats`): 17.8M chars become 5.94M (33%). Krier Foods 177K to 59K; Monbana 528K to 83K; needl.co 2.13M to 757K.
 
 All of this is plain string code, no model. Why it can be trusted: every rule is deterministic and only removes things that can be named exactly (repeats, placeholder URLs, link targets, empties, separators). Nothing here judges what is important; that is steps 3 to 5. Dedupe keeps the first occurrence, so a product name that appears on five pages is kept once, never lost. Two checks keep it honest: every stored result carries the raw-to-cleaned character ratio so an odd site stands out, and `clean-stats --show-dropped <id>` prints a sample of the dropped lines per site so the owner can eyeball what went (planned for a co-packer, a non-English site and needl.co before the pipeline is trusted).
 
@@ -133,7 +133,7 @@ Kept as a number so the step names in the code and the log still line up. Select
 
 ### Step 5. Merge into the card (LLM call, `gpt-6-luna`)
 
-The window results from step 3 (or the single selected block from step 4 when the lever is on) are merged by one call into a structured card:
+The window results from step 3 are merged by one call into a structured card:
 
 ```
 entity_type:   manufacturer | co_packer | both | marketplace | investor | distributor | other
@@ -146,13 +146,13 @@ summary:       one sentence
 
 Merge rules: products are deduplicated by normalised name, one quote kept per product; entity type is decided from the window votes with the first window (home page) weighted highest; a marketplace's listings and an investor's portfolio are not this company's products; every quote copied exactly; product names in English even if the site is not.
 
-Check in code: every quote must be found in the evidence that was sent, after both sides are normalised (Unicode NFKC, lowercase, curly quotes and dashes unified, markdown symbols stripped, whitespace collapsed). Models tend to drop `**` and straighten quotes, and a byte-exact check would reject faithful quotes. Exact matches count as verified; a fuzzy match (most of the quote's words inside one window) is kept but counted separately; anything else is dropped and counted. This is the first hallucination guard.
+Check in code: every quote must be found in the evidence that was sent, after both sides are normalised (Unicode NFKC, lowercase, curly quotes and dashes unified, markdown symbols stripped, whitespace collapsed). Models tend to drop `**` and straighten quotes, and a byte-exact check would reject faithful quotes. Exact matches count as verified; a fuzzy match (at least 80% of the quote's **distinct** words inside one window of the quote's length — distinct, so a repeated word cannot pay for an invented one) is kept but counted separately; anything else is dropped and counted. This is the first hallucination guard.
 
-Why the card exists at all: it turns a messy multilingual site into a clean English search query for step 6, and it decides once whether the company is a manufacturer, a co-packer, a marketplace or an investor, so that decision does not have to be re-argued per category. It is also the state given to Jev in phase D.
+Why the card exists at all: it turns a messy multilingual site into a clean English search query for step 6, and it decides once whether the company is a manufacturer, a co-packer, a marketplace or an investor, so that decision does not have to be re-argued per category. It was also the state given to Jev when the reference set was built (section 8).
 
 ### Step 6. Shortlist
 
-What is embedded: each `products[].name` and `capabilities[].name` from the card, the short English label ("Coffee Beans", "Oblong tablets"), not the quote. Quotes stay attached to the phrase as evidence for the judge; summary, brands, entity type and storage words are not embedded (storage words feed the policy step). A bare name such as "Powder" or "Bars" loses context. Decision rule (owner's, AI_LOG.md entry 8): name-only is the starting rule; phase D runs three variants over the 30 cards, name-only, name + quote, and conditional (name + quote only when the name is one or two tokens or the name-only top-8 has a low margin), and keeps the one with the lowest `not_in_shortlist` count at a comparable shortlist size. Name + summary is rejected: the summary is the same sentence for every row, so every query is pulled toward one centroid, the per-phrase lists overlap, and minor product lines drop out.
+What is embedded: each `products[].name` and `capabilities[].name` from the card, the short English label ("Coffee Beans", "Oblong tablets"), not the quote. Quotes stay attached to the phrase as evidence for the judge; summary, brands, entity type and storage words are not embedded (storage words feed the policy step). A bare name such as "Powder" or "Bars" loses context. Decision rule (owner's, AI_LOG.md entry 8): name-only is the starting rule; the three variants (name-only, name + quote, and conditional — name + quote only when the name is one or two tokens or the name-only top-8 has a low margin) were then run over the 30 cards against the reference set at zero model cost. Result (`artifacts/query-mode-study.json`): name misses 22 of the 391 truth groups, name + quote 22 at a smaller mean shortlist (153 vs 162), conditional 25. No gain, so `QUERY_MODE=name` ships and the other two stay runnable through `cli shortlist <id> --mode ...`. Name + summary is rejected: the summary is the same sentence for every row, so every query is pulled toward one centroid, the per-phrase lists overlap, and minor product lines drop out.
 
 For each product and capability phrase from the card, two searches run and are fused:
 - dense: embed the phrase (as a query), nearest categories by cosine
@@ -160,7 +160,9 @@ For each product and capability phrase from the card, two searches run and are f
 
 The two ranked lists are merged with reciprocal rank fusion (a category near the top of either list ranks high; near the top of both ranks highest). Top 8 per phrase. Union everything, keep the best fused score per category and remember which phrase matched it and by which path. Then sibling expansion: for every candidate, add all of its storage / qualifier siblings (Frozen X, Refrigerated X, Shelf Stable X, and bare X). This puts the contrast in front of the judge so the storage rule can be applied with the definitions visible.
 
-Cap at 120 by best score, never splitting a sibling group. Typical size: 50 to 100 (est.).
+Cap at max(120, 3 x card phrases) by best score, never splitting a sibling group: a group that does not fit is skipped whole and a smaller one behind it still gets in. Measured mean over the 30 manufacturers: 140 candidates (`artifacts/query-mode-study.json`).
+
+The cap, not `k`, is what decides retrieval recall, and buying more of it does not pay (`artifacts/retrieval-study.json`): raising `k` from 8 to 24 alone changes nothing, because the extra candidates compete for the same slots, while raising the cap to 600 at k=16 cuts the groups the judge never sees from 22 to 6. Run live, that converted 13 of them into true positives and brought 20 new false positives with them: precision 95.0% to 89.9%, F1 86.0% to 85.7%, cost $510 to $795 per 30,000. Rejected.
 
 Why a shortlist and not all 1424: the judge call would be ~40x bigger and the model would be picking from a wall of names, many of them single ambiguous words (Round, Loin, Ice, Thins). Every published system in `docs/RESEARCH.md` does retrieve-then-judge.
 
@@ -170,25 +172,26 @@ Input: the card, the quotes, the evidence blocks, and the candidates as `{id, na
 
 Not all at once. Long candidate lists make models attend to the top and bottom and neglect the middle ("lost in the middle"), so the shortlist is judged in batches of about 30, ordered by retrieval score, with sibling groups kept in the same batch. Every batch starts with the same text (instructions, card, evidence) and ends with its candidates, so OpenAI's prompt cache serves the shared prefix at a tenth of the price and the batching costs little extra.
 
-Output, per candidate: `{ id, applies, confidence 0-1 }`, plus `{ quote, reason }` only when `applies` is true, which keeps the output small.
+Output, per candidate: `{ id, applies, confidence 0-1, reason }` — a reason on every verdict, not only on the ones that apply (owner's decision: an unexplained rejection cannot be reviewed) — plus `quote` when `applies` is true.
 
 The prompt states the two rules: tag only when the site names the product type (not "we fill beverages" alone), and only claim a storage variant if a storage word appears with that product.
 
 ### Step 8. Validate (code, no model)
 
-- an id that was not in the batch is dropped and counted as `unknown_id` (so an invented category can never leave the service)
+- an id that was not in the batch is dropped and counted as `unknownIds` (so an invented category can never leave the service); an id answered twice in one batch is counted as `repeatedIds` and the repeat ignored
+- a candidate the model never answered for becomes `applies: false` flagged `missing_from_output`, so the verdict count always equals the candidate count
 - `applies: true` with a quote that is not in the evidence (same normalised check as step 5) becomes `applies: false` with reason `quote_not_found`
 
 ### Step 9. Policy (code, no model)
 
-- Storage rule: a storage-qualified category passes only if the product on the card has that storage word or the quote contains one. Otherwise, if the bare sibling exists, the verdict moves to it. If only qualified siblings exist (285 base names in this taxonomy exist only in qualified form: Mayonnaise, Frozen Dumpling ...), keep the strongest at its judge confidence and mark it `storage_inferred: true` with the reason. An earlier draft multiplied the confidence by 0.7 here; that would have let the cutoff below silently drop a fifth of the taxonomy.
-- Cutoff: return `applies && judge_confidence >= cutoff`, initial cutoff 0.6. Self-reported confidence is known to be poorly calibrated, and log-probabilities are not available with structured outputs, so the cutoff is not trusted as-is: phase D bins every accepted verdict by confidence against the arbiter's agreement and the final cutoff is read off that table. The retrieval score is stored beside the confidence for the same reason. Below-cutoff verdicts are stored as `rejected` for inspection.
-- Entity gate: for `marketplace` / `investor` the default policy returns an empty list with status `not_a_manufacturer`. This is a flag, parked until Keychain answers grill Q4.
+- Storage rule: a storage-qualified category passes only if the product on the card has that storage word or the quote contains one. If a sibling in the same group *is* evidenced, the site did state a storage state for this product, so the unevidenced variants are simply dropped (`storage_sibling_weaker`). Otherwise, if the bare sibling exists, the verdict moves to it — the bare one, found by `baseName(name) === name`, not merely one without a storage prefix, because the taxonomy also qualifies by Diet, Plant Based and Ready To Drink and "Diet Orange" is not the unqualified category. If only qualified siblings exist (285 base names in this taxonomy exist only in qualified form: Mayonnaise, Frozen Dumpling ...), keep the strongest at its judge confidence and mark it `storage_inferred: true` with the reason. An earlier draft multiplied the confidence by 0.7 here; that would have let the cutoff below silently drop a fifth of the taxonomy.
+- Cutoff: return `applies && judge_confidence >= cutoff`, initial cutoff 0.6. Self-reported confidence is known to be poorly calibrated, and log-probabilities are not available with structured outputs, so the cutoff is not trusted as-is: every accepted verdict is binned by confidence against the reference set and the cutoff is read off that table (no verdict below 0.7, identical F1 from 0.5 to 0.7, so 0.6 stays). The retrieval score is stored beside the confidence for the same reason. Below-cutoff verdicts are stored as `rejected` for inspection.
+- Entity gate: for `marketplace` / `investor` / `distributor` the default policy returns an empty list with status `not_a_manufacturer` — the three types both prompts already say do not own what they list, fund or resell. Keychain confirmed the empty answer is the correct one (README question 2); `NON_MANUFACTURER_POLICY=tag` flips it.
 - Status: `tagged`, `no_confident_category`, `not_a_manufacturer`, `insufficient_content`, `error`.
 
 ### What gets stored
 
-manufacturer id, result key (content hash + taxonomy hash + prompt versions + model ids), status, entity type, accepted categories (id, confidence, quote, reason, matched-by), rejected ones with reasons, the card, evidence stats (raw chars, cleaned chars, selected chars, fraction kept), usage per call and total (input, cached, output tokens), cost in dollars, versions, duration.
+manufacturer id, result key (manufacturer id + cleaned-content hash + taxonomy hash + prompt versions + model ids + query mode + cutoff + entity policy — everything that can change the answer), status, entity type, accepted categories (id, confidence, quote, reason, matched-by), rejected ones with reasons, the card, evidence stats (`rawChars`, `cleanedChars`, `chunks`, `windows`, `judgeEvidenceChars`, `quotes.{exact,fuzzy,none}`, `shortlist`, `batches`, `unknownIds`, `repeatedIds`), usage per call and total (input, cached, output, reasoning tokens), cost in dollars, versions, duration.
 
 ## 4. Data model
 
@@ -239,12 +242,14 @@ flowchart LR
   P[pipeline step] --> C{mode}
   C -- live --> K{in llm_cache?}
   K -- yes --> R[return cached response, cost 0]
-  K -- no --> O[OpenAI responses.parse<br/>zod schema] --> U[read usage: input, cached, output<br/>price from pricing table] --> W[(write llm_cache)] --> R
+  K -- no --> O[OpenAI responses.create<br/>text.format = zodTextFormat] --> U[read usage: input, cached, output<br/>price from pricing table] --> W[(write llm_cache, insert or ignore)] --> R
   C -- replay --> F{in artifacts/replay?}
   F -- yes --> R
   F -- no --> X[ReplayMissError naming the key]
   C -- stub --> S[canned response from the test]
 ```
+
+Only `live` is given a transport, so replay cannot reach the network whatever `OPENAI_API_KEY` holds: a miss is an error, never a surprise bill. Cache rows are written with `insert or ignore` — a key is the whole request, so an existing row already answers it, and a second process cannot rewrite evidence that has been exported.
 
 A parse failure is retried once with the validation error appended to the prompt; a second failure is a typed error and the manufacturer's result is stored as `error`, never half-tagged.
 
@@ -252,12 +257,12 @@ Cost is never estimated: it is `usage x price`, with the price table carrying th
 
 ## 6. Cost: where it goes and the levers
 
-Where the money goes (measured, live run of all 30 on `gpt-6-luna`, `artifacts/report.md`): $0.51 for 30 manufacturers, mean $0.017, median $0.013, max $0.075 (bigbrandsllc.com, 121 products); 3.23M input tokens of which the window reads are 47% and the judge batches 53%, 374K output tokens. Retrieval and scoring are free (local model). Projected for 30,000 manufacturers: $510, or $255 on the Batch API. The same run on `gpt-5.6-luna` cost $1.01. Prompt cache hits were 0%: on GPT-5.6 and later the cache needs an explicit breakpoint and charges writes at 1.25x, so it is a lever still to take on the judge prefix (estimated 10 to 15%).
+Where the money goes (measured, live run of all 30 on `gpt-6-luna`, `artifacts/report.md`): $0.51 for 30 manufacturers, mean $0.017, median $0.012, max $0.075 (bigbrandsllc.com, 121 products); 3.23M input tokens of which the window reads are 47% and the judge batches 53%, 374K output tokens. Retrieval and scoring are free (local model). Projected for 30,000 manufacturers: $510, or $255 on the Batch API. The same run on `gpt-5.6-luna` cost $1.01. Prompt cache hits were 0%: on GPT-5.6 and later the cache needs an explicit breakpoint and charges writes at 1.25x, so it is a lever still to take on the judge prefix (estimated 10 to 15%).
 
 | Lever | What it does | How it is decided |
 |---|---|---|
 | Line-level cleaning | 67% fewer chars before any model touches the text | measured, free |
-| One model, effort dialled down | `gpt-6-luna` for every pipeline call; reasoning effort low for the window reads and the merge, default for the judge; the judge moves to a bigger model only if the phase D cause breakdown says the judge is the weak link | report |
+| One model, effort dialled down | `gpt-6-luna` for every pipeline call; reasoning effort low for the window reads and the merge, default for the judge; the judge would move to a bigger model only if the cause breakdown said the judge is the weak link, and it says the opposite: 60 of the 84 misses are the judge reading a definition too narrowly, which a prompt change addresses more cheaply (tested, see the README's rejected v3) | report |
 | Evidence selection (built, measured, removed) | read a scored subset instead of the whole site | `artifacts/budget-study.json`: loses 3x the noise floor at every budget; would have saved $0.27 to $0.35 per 30 profiles. See step 3 |
 | Trimmed definitions in the judge | 300 chars instead of ~1,700 per candidate | fixed |
 | Shortlist cap and judge batching | bounds the judge call; batches share a prefix meant for the prompt cache | cap max(120, 3 x card phrases), batches of ~30; measured cache hit share 0%, see above |
@@ -270,15 +275,22 @@ When it stops: the budget is full, the shortlist is capped, one retry at most. T
 ## 7. Service contract
 
 ```
-POST /v1/tagging-jobs                 { manufacturer_ids?: [..], all?: true, force?: false }  -> 202 { job_id }
-GET  /v1/tagging-jobs/:id             -> { status, total, done, failed, per_manufacturer: [{ id, status, cost_usd }] }
-GET  /v1/manufacturers/:id/categories -> stored result, or 404 { error: "not_tagged" }
-POST /v1/manufacturers/:id/tag?wait=true -> runs now and returns the result
+POST /v1/tagging-jobs                 { manufacturer_ids?: [..], all?: true, force?: false }
+                                      -> 202 { job_id, manufacturers }
+GET  /v1/tagging-jobs/:id             -> 200 { job_id, status, counts: { total, pending, done, failed },
+                                               cost_usd, manufacturers: { "<id>": { status, result_key,
+                                               status_detail, cost_usd, error? } }, created_at, updated_at }
+                                      -> 404 { error: "job_not_found" }
+GET  /v1/manufacturers/:id/categories -> 200 stored result, or 404 { error: "not_tagged" }
+POST /v1/manufacturers/:id/tag        ?wait=true runs now -> 200 result (502 with the same body on a
+                                      pipeline error); without wait -> 202 { job_id };
+                                      unknown id -> 404 { error: "unknown_manufacturer" }
+GET  /healthz                         -> 200 { ok, mode }
 ```
 
-Why this shape: the platform "runs across the full manufacturer base", which is a job, not 30,000 blocking calls. One sync endpoint exists for the one-off case and for the demo. Results are idempotent on content hash + taxonomy hash + prompt versions, so calling twice is safe and cheap, and every result says which versions produced it.
+Why this shape: the platform "runs across the full manufacturer base", which is a job, not 30,000 blocking calls. One sync endpoint exists for the one-off case and for the demo. Results are idempotent on the result key (see step 9), so calling twice is safe and cheap, every result says which versions produced it, and two callers asking for the same manufacturer at the same moment share one pipeline run rather than paying twice.
 
-The job runner is a table-backed loop inside the process. If Keychain has a queue, the contract does not change.
+The job runner is a table-backed loop inside the process: pending jobs resume after a restart, and a job that fails outside its per-item guard is marked `failed` while the loop drains the rest. If Keychain has a queue, the contract does not change. Its one known limit is scale: a job keeps its per-manufacturer state in a single `items` column, which is fine for 30 and would be a few megabytes rewritten per completion at 30,000 — a `job_items` table is the fix, and it is not built.
 
 ## 8. The reference set and how the pipeline is scored
 
@@ -295,14 +307,14 @@ flowchart LR
 
 Why an independent model over all 1,424 and not our own shortlist: a reference that shares the pipeline's retrieval inherits its misses, and the point was to measure those (`not_in_shortlist`, `not_on_card`). Why an arbiter: Jev proved generous (56 positives for refresco.com against 15 returned); of the 416 disagreements the arbiter sided with the pipeline 316 times and with Jev 100 times, so scoring against raw Jev would have punished correct rejections. Neither Jev nor the arbiter is part of the pipeline; the TypeSafe SDK is not in the repo any more; `npm run cli -- report` reads the stored results and the reference file and makes no model calls.
 
-What the report leaves behind: `artifacts/report.md` (accuracy, misses by cause and by manufacturer, calibration, cost), `artifacts/calibration.json`, and the earlier `artifacts/spot-check.md` (20 arbiter verdicts for the owner's eye). Known limits, stated in the README: the reference is only as good as one Jev run corrected by one sol pass; where the pipeline, Jev and the arbiter all agree, nobody checked; and the six `not_a_manufacturer` answers are agreed by construction (Keychain's answer 2), so a wrong entity gate is invisible to it. `artifacts/query-mode-study.json` reuses the reference to compare the three retrieval query modes at zero model cost.
+What the report leaves behind: `artifacts/report.md` (accuracy, misses by cause and by manufacturer, calibration, cost), `artifacts/calibration.json`, and the earlier `artifacts/spot-check.md` (20 arbiter verdicts for the owner's eye). Known limits, stated in the README: the reference is only as good as one Jev run corrected by one sol pass; where the pipeline, Jev and the arbiter all agree, nobody checked; and the five `not_a_manufacturer` answers are agreed by construction (Keychain's answer 2), so a wrong entity gate is invisible to it. `artifacts/query-mode-study.json` reuses the reference to compare the three retrieval query modes at zero model cost.
 
 ## 9. Where the model is trusted and where it is not
 
 | Decision | Who makes it | Why |
 |---|---|---|
 | Which lines are junk | code | deterministic, free, measured |
-| Which chunks to read | none by default, everything is read; the optional lever uses local embeddings and must prove no loss in the budget study | correctness is graded, and a dropped chunk is unrecoverable |
+| Which chunks to read | nobody: everything is read. A selection lever was built, measured and removed (step 3) | correctness is graded, and a dropped chunk is unrecoverable |
 | What the company makes, whether it is a manufacturer | LLM (profile) | needs reading comprehension; guarded by the quote check |
 | Which categories to consider | embeddings + exact names | fast, and the judge never sees anything else |
 | Whether a category applies | LLM (judge) | needs the definition and the evidence side by side |
@@ -318,11 +330,11 @@ Three layers keep the model from making basic mistakes. Guards are code that run
 
 | Guard | Mistake it stops | Where | What it leaves behind |
 |---|---|---|---|
-| Quote must be in the text sent | the model "remembers" a product from its training instead of reading the site, or invents a quote | step 5, after the merge | `profile.dropped_quotes` and `profile.fuzzy_quotes` counts |
-| Id must be in the batch | the judge names a category it was never shown | step 8 | `unknown_id` count |
+| Quote must be in the text sent | the model "remembers" a product from its training instead of reading the site, or invents a quote | step 5, after the merge | `evidence.quotes.{exact,fuzzy,none}` per result (2,452 / 22 / 8 over the 30) |
+| Id must be in the batch | the judge names a category it was never shown | step 8 | `evidence.unknownIds` and `evidence.repeatedIds` (0 / 0 over the 30) |
 | `applies` needs a found quote | the judge says yes without evidence | step 8 | verdict flipped to no, reason `quote_not_found`, counted |
 | Storage variant needs a storage word | Frozen X claimed when the site only says X | step 9 | verdict moved to the bare sibling, or `storage_inferred: true` with reason |
-| One retry, then `error` | malformed JSON silently becomes a half-tagged manufacturer | LLM client, section 5 | `status: error` with both raw outputs kept; never a partial result |
+| One retry, then `error` | malformed JSON silently becomes a half-tagged manufacturer | LLM client, section 5 | `status: error` carrying both raw outputs in the message, the tokens already spent still charged, and the row retried on the next call rather than served back |
 | Fixed bounds | a runaway loop or an unbounded prompt | section 6 | window count, shortlist cap max(120, 3 x phrases), batch size ~30, one retry max |
 
 **Layer 2: guardrails (what the model may decide)**
@@ -333,7 +345,7 @@ Three layers keep the model from making basic mistakes. Guards are code that run
 | Ids, never names | four category names exist twice with different ids; a name is ambiguous, an id is not | contract, section 7 |
 | Definitions shown, trimmed | single-word names (Round, Loin, Ice, Thins) misread without their definition | step 7 |
 | Sibling groups judged together | Refrigerated X chosen without seeing Shelf Stable X and X beside it | step 6 |
-| Entity gate before tagging | a marketplace or an investor tagged with everything it lists or owns | steps 5 and 9 |
+| Entity gate before tagging | a marketplace, investor or distributor tagged with everything it lists, owns or resells | steps 5 and 9 |
 | Confidence cutoff set from data, not trusted as given | self-reported confidence is poorly calibrated; the calibration table showed no verdict below 0.7 and identical F1 from 0.5 to 0.7, so 0.6 stays and the quote + reason are the reviewable signal | step 9, section 8 |
 | Trust table (section 9) | the model deciding things code should decide (dedupe, id validity, quote validity, storage policy) | whole pipeline |
 
@@ -342,10 +354,11 @@ Three layers keep the model from making basic mistakes. Guards are code that run
 | Eval | Question it answers | What it leaves behind |
 |---|---|---|
 | Score against `artifacts/reference.json` (built once from Jev + arbiter, section 8) | how many of the 391 known-correct groups come back, and how many returned groups are wrong? | P / R / F1 per manufacturer and overall in `artifacts/report.md` |
-| Cause breakdown | where do misses come from: `not_on_card`, `not_in_shortlist`, `judge_rejected`, `below_cutoff`, `policy_moved`, `pipeline_only` | counts per cause in the report |
-| Calibration table | does a 0.8 mean 80%? | confidence bins vs the reference; cutoff table in `artifacts/calibration.json` |
+| Cause breakdown | which stage lost each missed group: `not_on_card`, `not_in_shortlist`, `judge_rejected`, `below_cutoff`, `policy_moved`, `entity_gate`, `quote_not_found` | counts per cause in the report, summing to the false negatives; wrong tags are listed apart |
+| Calibration table | does a 0.8 mean 80%, and would another cutoff score better? | confidence bins and a cutoff table in `artifacts/calibration.json`, scored against all 391 reference groups so it is the same metric as the accuracy table |
 | Second full read per site | how much do two reads of the same site disagree? | `artifacts/budget-study.json`: 9.8% |
 | Query-mode study | does name + quote or a conditional query shortlist more of the reference? | `artifacts/query-mode-study.json`: no (22 / 22 / 25 of 391 missed) |
+| Retrieval study | can the 18 groups the judge never sees be bought back, and does buying them pay? | `artifacts/retrieval-study.json`: yes and no - the cap buys them (22 misses down to 3), and live it trades 5 points of precision for 3 of recall at 56% more cost |
 | No-key replay of a fresh copy | does the whole run reproduce without a key, byte for byte on cost? | the fresh-copy check, identical total |
 | Owner spot-check | is the arbiter itself right? | `artifacts/spot-check.md`, 20 verdicts with an Owner column |
 | Cost table | what does each manufacturer cost, and each call type, and the whole base? | measured tokens and dollars, x30,000 projection |
@@ -361,7 +374,7 @@ Three checks were run on the first draft: a web research pass on better alternat
 | Change | Why |
 |---|---|
 | Chunk scoring is contrastive, not "closest category" (selection lever, later removed) | Probe 01 showed the original does not separate product text from job ads and privacy pages; probe 02 showed the contrastive version does, in English and German |
-| Full read with `gpt-6-luna` at low effort is the default; selection is an off-by-default lever that must prove no loss | Owner's decision during the page review (AI_LOG.md entry 8): the brief grades correctness, a subset reader can silently drop products, and the cost gap (est. ~$350 vs ~$120 per 30K re-tag) does not buy back a recall cap. The earlier 90% / 75% study bar was the AI's invention and is gone |
+| Full read with `gpt-6-luna` at low effort is the default; selection was an off-by-default lever that had to prove no loss, was measured, and was removed (step 3) | Owner's decision during the page review (AI_LOG.md entry 8): the brief grades correctness, a subset reader can silently drop products, and the cost gap (est. ~$350 vs ~$120 per 30K re-tag) does not buy back a recall cap. The earlier 90% / 75% study bar was the AI's invention and is gone |
 | Hybrid BM25 + dense retrieval with rank fusion | Published as a reliable gain over dense-only at near-zero cost; also fixes substring over-matching of short category names |
 | Judge in batches of ~30 with a cached shared prefix | Lost-in-the-middle is documented at ~100-item lists; batching with prompt caching costs little |
 | No 0.7 confidence multiplier; `storage_inferred` flag instead | The multiplier combined with the 0.6 cutoff would have silently dropped every product whose category exists only in qualified form (285 base names) |
