@@ -612,3 +612,30 @@ After the single-process `tag-all --force`: 30 results, $1.0077 total; `cache ex
 **Spend this session:** $0.18 (evidence matcher) + $0.55 (retrieval depth and cap) + $0.0077 (the replay fall-through, entry 16) = **about $0.74**, all of it on answers rather than on output: three named changes are now settled with numbers instead of opinions.
 
 **Outcome:** accepted. Nothing committed. The accuracy is where it was, and the repo now says why that is, at every place someone would think to change it.
+
+### 18. Second full review after the experiments: seven named reviewers, cross-verified, report only  (2026-09-28, Claude Code)
+
+**Prompt** (verbatim):
+> I want you to do a full /code-review , /security-review , /god-review , /ponytail:ponytail-audit , /ponytail:ponytail-review and /ce-code-review of the whole repo and the changes we have made although they are still uncommited. Also /improve-codebase-architecture. Report your audits and where improvements and all is required after cross verifying what each reviewer returns and all.
+
+Two of the seven (god-review and ce-code-review) were stopped before they finished; the other five are reported.
+
+**Response summary:** one read-only agent per named review, all over the whole tree (there are no commits, so the whole tree is the change), none allowed to call a model or write into the repo. Five returned; god-review and ce-code-review were stopped mid-run by the owner and left no findings file, so they are not counted. Every correctness and security claim was re-checked here against the code, with scratch scripts where a claim was about runtime behaviour. Reported, not fixed: the prompt asked for a report.
+
+**CATCH (entry 16 was wrong about its own fix):** entry 16 says `cache export` "deletes only the `.json` files it is about to rewrite". It does not: `replay.ts:35` deletes every `.json` file in the target directory, so `cli cache export .` deletes `package.json`, `package-lock.json` and `tsconfig.json`, and `cli cache export artifacts` deletes `reference.json`. Two reviewers found it independently, and I confirmed it from the code. The refusal guard added in entry 16 cannot catch this, because the replay import at startup always leaves rows to export.
+
+**CATCH (the result key's comment overstates it):** `versions()` says it holds "everything that can change the answer". It hashes the prompt *label* `v2`, not the prompt text, and leaves out `judgeBatchSize`, `windowChars`, `chunkChars`, `effortProfile` and `MIN_CLEANED_CHARS`. So editing `judge.v2.md` in place, or changing the batch size, gives back the old stored answer until someone passes `--force`. That is exactly the move an interviewer's "now extend it" invites.
+
+**Other confirmed findings:**
+- `GET /categories` serves the newest row of any version, error rows included, with a 200.
+- A forced re-run that fails overwrites the good answer, because it has the same key.
+- Spend is lost on the failure paths: the window calls when the profile step fails, the earlier batches when a judge batch fails, and both paid attempts inside `LlmOutputError`.
+- An unparseable cached row is paid for again on every run, because the insert is `insert or ignore`.
+- The jobs endpoint accepts any number of ids, unchecked.
+- The quote guard passes punctuation-only quotes as fuzzy, and one-word quotes such as "We" as exact.
+- The profile prompt still calls "fresh" a storage word, which undoes the entry-16 policy fix through the card path.
+- The French singular storage words do not match.
+- Two sentences in ARCHITECTURE describe guards that do not exist: "the budget is full", and entity type "guarded by the quote check".
+- Ponytail found about 60–70 lines to cut out of about 3,250, and no dependency worth dropping.
+
+**Outcome:** reported to the owner with a proposed fix list. Nothing was changed except this entry. Nothing committed.
