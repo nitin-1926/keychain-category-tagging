@@ -5,8 +5,7 @@
 // Next step: pipeline/judge.ts, on the candidates this returns.
 
 import { config } from '../config.js';
-import { baseName, type Hit, type TaxonomyIndex } from '../index/taxonomy.js';
-import { tokenize } from '../index/taxonomy.js';
+import { baseName, tokenize, type Hit, type TaxonomyIndex } from '../index/taxonomy.js';
 import type { Card } from './profile.js';
 
 export type MatchedBy = 'dense' | 'bm25' | 'both' | 'sibling';
@@ -20,7 +19,7 @@ export type Candidate = {
   group: string; // sibling group key (base name)
 };
 
-export type Phrase = { name: string; quote: string };
+type Phrase = { name: string; quote: string };
 
 export function phrasesOf(card: Card): Phrase[] {
   return [...card.products, ...card.capabilities].map((p) => ({ name: p.name, quote: p.quote }));
@@ -30,7 +29,7 @@ export function phrasesOf(card: Card): Phrase[] {
 // 30 cards against the reference set (artifacts/query-mode-study.json): name misses 22 of the
 // 391 truth groups here, name + quote 22, conditional 25, so `name` ships and the other two stay
 // runnable (`cli shortlist <id> --mode ...`) as the evidence for that choice.
-export async function retrieve(p: Phrase, index: TaxonomyIndex, k: number, mode = config.QUERY_MODE): Promise<Hit[]> {
+async function retrieve(p: Phrase, index: TaxonomyIndex, k: number, mode = config.QUERY_MODE): Promise<Hit[]> {
   const withQuote = `${p.name}: ${p.quote}`;
   if (mode === 'name_quote') return index.searchHybrid(withQuote, k);
   const hits = await index.searchHybrid(p.name, k);
@@ -40,11 +39,12 @@ export async function retrieve(p: Phrase, index: TaxonomyIndex, k: number, mode 
   return tokenize(p.name).length <= 2 || flat ? index.searchHybrid(withQuote, k) : hits;
 }
 
-export async function shortlist(card: Card, index: TaxonomyIndex, opts: { k?: number; cap?: number; mode?: typeof config.QUERY_MODE } = {}): Promise<Candidate[]> {
-  const k = opts.k ?? config.retrievalK;
+export async function shortlist(card: Card, index: TaxonomyIndex, opts: { cap?: number; mode?: typeof config.QUERY_MODE } = {}): Promise<Candidate[]> {
+  const k = config.retrievalK;
   const phrases = phrasesOf(card);
-  // Owner's decision (AI_LOG entry 11): the cap scales so every phrase keeps its top hits.
-  const cap = opts.cap ?? Math.max(config.shortlistCap, 3 * phrases.length);
+  // Owner's decision (AI_LOG entry 11): the cap scales so every phrase keeps its top hits, up to a
+  // hard ceiling that bounds what one manufacturer can cost (config.shortlistMax).
+  const cap = opts.cap ?? Math.min(Math.max(config.shortlistCap, 3 * phrases.length), config.shortlistMax);
   const byId = new Map<number, Candidate>();
   const cat = (id: number) => index.category(id)!;
 
@@ -73,9 +73,7 @@ export async function shortlist(card: Card, index: TaxonomyIndex, opts: { k?: nu
   }
 
   // Cap by best score, whole sibling groups only.
-  const groups = new Map<string, Candidate[]>();
-  for (const c of byId.values()) groups.set(c.group, [...(groups.get(c.group) ?? []), c]);
-  const ordered = [...groups.values()]
+  const ordered = [...Map.groupBy(byId.values(), (c) => c.group).values()]
     .map((g) => g.sort((a, b) => b.score - a.score || a.id - b.id))
     .sort((a, b) => b[0]!.score - a[0]!.score || a[0]!.id - b[0]!.id);
   const out: Candidate[] = [];
