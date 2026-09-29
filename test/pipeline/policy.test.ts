@@ -37,6 +37,26 @@ describe('policy', () => {
     expect(r.accepted[0]!.storageInferred).toBeUndefined();
   });
 
+  // `\b` is ASCII-only in JavaScript: it never ended a word on é, so only the plural forms counted.
+  it('French and German storage words count in singular and plural', () => {
+    // Evidenced means kept as it is: not moved to the bare sibling, not flagged storage_inferred.
+    for (const quote of ['plat surgelé', 'plats surgelés', 'produit congelé ici', 'tiefgekühlte Knödel']) {
+      const r = applyPolicy([v(1, 'Frozen Dumpling', 'dumpling', true, 0.8, { quote, phrases: ['dumplings'] })], card(), opts);
+      expect(r.accepted.map((d) => [d.id, d.storageInferred]), quote).toEqual([[1, undefined]]);
+    }
+    const r = applyPolicy([v(1, 'Refrigerated Coconut Milk', 'coconut milk', true, 0.8, { quote: 'lait de coco réfrigéré' }), v(2, 'Coconut Milk', 'coconut milk', false, 0.3)], card(), opts);
+    expect(r.accepted.map((d) => d.id)).toEqual([1]);
+  });
+
+  // The profile prompt counts "fresh" as a storage word, so the card can carry what the storage
+  // words here deliberately refuse. Its own quote shows where it came from.
+  it('a card product marked refrigerated only because its quote says fresh is not storage evidence', () => {
+    const freshCard = (quote: string): Card => ({ ...card(), products: [{ name: 'coconut milk', quote, storage: 'refrigerated' }] });
+    const verdicts = () => [v(1, 'Refrigerated Coconut Milk', 'coconut milk', true, 0.8), v(2, 'Coconut Milk', 'coconut milk', false, 0.3)];
+    expect(applyPolicy(verdicts(), freshCard('Fresh coconut milk'), opts).accepted.map((d) => d.id)).toEqual([2]);
+    expect(applyPolicy(verdicts(), freshCard('Fresh, chilled coconut milk'), opts).accepted.map((d) => d.id)).toEqual([1]);
+  });
+
   it('only qualified siblings exist -> strongest kept at its confidence with storage_inferred', () => {
     const r = applyPolicy(
       [v(1, 'Frozen Dumpling', 'dumpling', true, 0.7, { phrases: ['dumplings'] }), v(2, 'Shelf Stable Dumpling', 'dumpling', true, 0.5, { phrases: ['dumplings'] })],

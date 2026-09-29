@@ -18,42 +18,43 @@ export type Decision = Verdict & {
   rejectReason?: 'judge_rejected' | 'below_cutoff' | 'entity_gate' | 'storage_moved' | 'storage_sibling_weaker';
 };
 
-export type PolicyResult = { status: Status; accepted: Decision[]; rejected: Decision[] };
+type PolicyResult = { status: Status; accepted: Decision[]; rejected: Decision[] };
 
-const STORAGE_PREFIX: Record<Storage, RegExp> = {
-  frozen: /^frozen /,
-  refrigerated: /^refrigerated /,
-  shelf_stable: /^shelf stable /,
-};
+export function storageOf(name: string): Storage | null {
+  const m = /^(frozen|refrigerated|shelf stable) /.exec(normalize(name));
+  return m ? (m[1]!.replace(' ', '_') as Storage) : null;
+}
+
+// A whole word in any script: `\b` is ASCII-only in JavaScript, so it never ends a word on an
+// accented letter and "plat surgelé" or "produit réfrigéré" would not count.
+const word = (alternatives: string) => new RegExp(`(?<![\\p{L}\\p{N}])(${alternatives})(?![\\p{L}\\p{N}])`, 'iu');
 // Storage words in the site's own language: en, de, fr (the three languages in the dataset).
 // "fresh" / "frisch" / "frais" are deliberately absent: they are ordinary marketing copy on a
 // food site ("made with fresh coconuts"), not a claim that the product is sold chilled.
 const STORAGE_WORDS: Record<Storage, RegExp> = {
-  frozen: /\b(frozen|freezer|deep frozen|tiefk[uü]hl\w*|gefroren|surgel[ée]s?|congel[ée]s?)\b/i,
-  refrigerated: /\b(refrigerated|chilled|gek[uü]hlt|r[ée]frig[ée]r[ée]s?)\b/i,
-  shelf_stable: /\b(shelf[- ]stable|ambient|long[- ]life|haltbar|lagerf[aä]hig|longue conservation)\b/i,
+  frozen: word('frozen|freezer|deep frozen|tief(?:ge)?k[uü]hl\\p{L}*|gefroren\\p{L}*|surgel[ée]e?s?|congel[ée]e?s?'),
+  refrigerated: word('refrigerated|chilled|gek[uü]hlt\\p{L}*|r[ée]frig[ée]r[ée]e?s?'),
+  shelf_stable: word('shelf[- ]stable|ambient|long[- ]life|haltbar\\p{L}*|lagerf[aä]hig\\p{L}*|longue conservation'),
 };
+const FRESH = word('fresh|frisch\\p{L}*|frais|fra[iî]che?s?');
 
-export function storageOf(name: string): Storage | null {
-  const n = normalize(name);
-  for (const s of Object.keys(STORAGE_PREFIX) as Storage[]) if (STORAGE_PREFIX[s].test(n)) return s;
-  return null;
-}
-
-// Evidence for a storage state: a retrieving card product carries it, or the judge's quote names it.
+// Evidence for a storage state: the judge's quote names it, or a retrieving card product carries
+// it. The profile prompt lists "fresh" among its storage words, so a card product whose own quote
+// says fresh and names no storage word ("Fresh Bakery" -> refrigerated) is not taken as evidence:
+// that is the "fresh" the rule above already refuses, arriving by the card instead.
 function storageEvidenced(v: Verdict, state: Storage, card: Card): boolean {
   if (v.quote && STORAGE_WORDS[state].test(v.quote)) return true;
   const phrases = new Set(v.phrases.map(normalize));
-  return card.products.some((p) => p.storage === state && phrases.has(normalize(p.name)));
+  return card.products.some(
+    (p) => p.storage === state && phrases.has(normalize(p.name)) && !(FRESH.test(p.quote) && !STORAGE_WORDS[state].test(p.quote)),
+  );
 }
 
 export function applyPolicy(verdicts: Verdict[], card: Card, opts: { cutoff: number; nonManufacturerPolicy: 'empty' | 'tag' }): PolicyResult {
   const decisions: Decision[] = verdicts.map((v) => ({ ...v }));
 
   // Storage rule, per sibling group.
-  const groups = new Map<string, Decision[]>();
-  for (const d of decisions) groups.set(d.group, [...(groups.get(d.group) ?? []), d]);
-  for (const g of groups.values()) {
+  for (const g of Map.groupBy(decisions, (d) => d.group).values()) {
     // The unqualified category, not merely one without a storage prefix: baseName strips eleven
     // prefixes (Diet, Plant Based, Ready To Drink ...) and storageOf knows only three, so
     // `storageOf(name) === null` would promote "Diet Orange" as if it were "Orange".
@@ -81,7 +82,7 @@ export function applyPolicy(verdicts: Verdict[], card: Card, opts: { cutoff: num
       unevidenced.sort((a, b) => b.confidence - a.confidence || a.id - b.id);
       const keep = unevidenced[0]!;
       keep.storageInferred = true;
-      keep.reason = `${keep.reason ?? ''} [storage not evidenced; only qualified categories exist]`.trim();
+      keep.reason = `${keep.reason} [storage not evidenced; only qualified categories exist]`.trim();
       for (const d of unevidenced.slice(1)) Object.assign(d, { applies: false, rejectReason: 'storage_sibling_weaker' as const });
     }
   }
