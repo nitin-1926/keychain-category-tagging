@@ -3,7 +3,7 @@
 // Calls: nothing. Next step: text/chunk.ts, on the `lines` this returns.
 // No judgement about content happens here - only rules that can be named exactly.
 
-export type CleanResult = {
+type CleanResult = {
   lines: string[];
   text: string;
   dropped: { reason: 'empty' | 'duplicate' | 'trivial'; line: string }[];
@@ -22,7 +22,6 @@ export function cleanLine(raw: string): string {
     .trim();
 }
 
-const dedupeKey = (line: string) => line.toLowerCase();
 const isTrivial = (line: string) => line.length < 2 || !/[\p{L}\p{N}]/u.test(line);
 
 export function clean(markdown: string): CleanResult {
@@ -39,7 +38,7 @@ export function clean(markdown: string): CleanResult {
       dropped.push({ reason: 'trivial', line });
       continue;
     }
-    const key = dedupeKey(line);
+    const key = line.toLowerCase();
     if (seen.has(key)) {
       dropped.push({ reason: 'duplicate', line });
       continue;

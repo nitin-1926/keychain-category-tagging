@@ -30,5 +30,3 @@ export function toApi(r: TagResult) {
     error: r.error,
   };
 }
-
-export type ApiResult = ReturnType<typeof toApi>;

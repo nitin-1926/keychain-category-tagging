@@ -13,7 +13,7 @@ export type Manufacturer = { id: number; name: string; domain: string; markdown:
 export function openSource(path: string) {
   const db = new Database(path, { readonly: true, fileMustExist: true });
 
-  const categories = db.prepare<[], { id: number; name: string; definition: string | null }>(
+  const categories = db.prepare<[], Category>(
     'select id, name, definition from category order by id',
   );
   const manufacturer = db.prepare<[number], Manufacturer>(

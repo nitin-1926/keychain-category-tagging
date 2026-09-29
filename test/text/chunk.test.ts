@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { chunk } from '../../src/text/chunk.js';
 
 describe('chunk', () => {
-  it('starts a new chunk at each heading and remembers the heading', () => {
+  it('starts a new chunk at each heading', () => {
     const lines = ['# Site', 'intro line', '## Products', 'juice', 'coffee', '## Careers', 'hiring'];
     const out = chunk(lines, 1_000);
-    expect(out.map((c) => c.heading)).toEqual(['Site', 'Products', 'Careers']);
+    expect(out.map((c) => c.text.split('\n')[0])).toEqual(['# Site', '## Products', '## Careers']);
     expect(out[1]!.text).toBe('## Products\njuice\ncoffee');
     expect(out.map((c) => c.index)).toEqual([0, 1, 2]);
   });

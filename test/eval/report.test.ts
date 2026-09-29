@@ -7,7 +7,7 @@ import type { Card } from '../../src/pipeline/profile.js';
 import { ZERO_USAGE } from '../../src/llm/pricing.js';
 
 const names: Record<number, string> = { 1: 'Coconut Milk', 4: 'Kombucha', 5: 'Frozen Dumpling', 6: 'Cold Brew' };
-const ref = (ids: number[]): Map<string, Group> => new Map(ids.map((id) => { const key = names[id]!.toLowerCase().replace(/^frozen /, ''); return [key, { key, ids: [id], names: [names[id]!] }]; }));
+const ref = (ids: number[]): Map<string, Group> => new Map(ids.map((id) => { const key = names[id]!.toLowerCase().replace(/^frozen /, ''); return [key, { key, names: [names[id]!] }]; }));
 const card = (products: string[], storage: Card['products'][0]['storage'] = null): Card => ({
   entity_type: 'manufacturer', products: products.map((name) => ({ name, quote: name, storage })), capabilities: [], brands: [], site_language: 'en', summary: '',
 });

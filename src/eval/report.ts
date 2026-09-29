@@ -34,7 +34,7 @@ export async function compareAll(deps: Deps, reference: Reference): Promise<Comp
     if (!row || !ref) continue;
     const result = fromRow(row);
     if (!result.card) continue;
-    const truth = new Map<string, Group>(ref.groups.map((g) => [g.key, { key: g.key, ids: g.ids, names: g.names }]));
+    const truth = new Map<string, Group>(ref.groups.map((g) => [g.key, { key: g.key, names: g.names }]));
     const pipe = pipelineGroups(result.accepted);
     const mismatches = await diff(pipe, truth, { accepted: result.accepted, rejected: result.rejected, card: result.card });
     out.push({ id, domain: ref.domain, result, mismatches, scores: score(pipe, mismatches) });

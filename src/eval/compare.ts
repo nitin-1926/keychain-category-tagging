@@ -4,14 +4,14 @@
 // category on the card at all?") and index/taxonomy.ts baseName() for grouping.
 
 import { dot, embedQueries } from '../index/embed.js';
-import { baseName } from '../index/taxonomy.js';
+import { baseName, tokenize } from '../index/taxonomy.js';
 import type { Decision } from '../pipeline/policy.js';
 import type { Card } from '../pipeline/profile.js';
-import { normalize } from '../text/normalize.js';
+import { phrasesOf } from '../pipeline/shortlist.js';
 
-export type Cause = 'not_on_card' | 'not_in_shortlist' | 'judge_rejected' | 'below_cutoff' | 'policy_moved' | 'entity_gate' | 'quote_not_found' | 'pipeline_only';
+type Cause = 'not_on_card' | 'not_in_shortlist' | 'judge_rejected' | 'below_cutoff' | 'policy_moved' | 'entity_gate' | 'quote_not_found' | 'pipeline_only';
 
-export type Group = { key: string; ids: number[]; names: string[] };
+export type Group = { key: string; names: string[] };
 export type Mismatch = { key: string; names: string[]; cause: Cause };
 
 export type Metrics = { tp: number; fp: number; fn: number; precision: number; recall: number; f1: number };
@@ -24,24 +24,17 @@ export function metrics(tp: number, fp: number, fn: number): Metrics {
 }
 
 export function pipelineGroups(accepted: Decision[]): Map<string, Group> {
-  const groups = new Map<string, Group>();
-  for (const d of accepted) {
-    const g = groups.get(d.group) ?? { key: d.group, ids: [], names: [] };
-    g.ids.push(d.id);
-    g.names.push(d.name);
-    groups.set(d.group, g);
-  }
-  return groups;
+  return new Map([...Map.groupBy(accepted, (d) => d.group)].map(([key, ds]) => [key, { key, names: ds.map((d) => d.name) }]));
 }
 
 // Category name vs card phrase cosine above which the product counts as "on the card".
 const ON_CARD_FLOOR = 0.85;
 
 // Was this category on the card at all? Exact token overlap with a card phrase, or a close embedding.
-export async function onCard(names: string[], card: Card): Promise<boolean> {
-  const phrases = [...card.products, ...card.capabilities].map((p) => p.name);
+async function onCard(names: string[], card: Card): Promise<boolean> {
+  const phrases = phrasesOf(card).map((p) => p.name);
   if (!phrases.length) return false;
-  const tokens = (s: string) => new Set(normalize(s).split(/[^\p{L}\p{N}]+/u).filter((t) => t.length > 2));
+  const tokens = (s: string) => new Set(tokenize(s).filter((t) => t.length > 2));
   for (const n of names) {
     const nt = tokens(baseName(n));
     if ([...nt].length && phrases.some((p) => [...nt].every((t) => tokens(p).has(t)))) return true;
@@ -50,21 +43,27 @@ export async function onCard(names: string[], card: Card): Promise<boolean> {
   return vn.some((a) => vp.some((b) => dot(a, b) >= ON_CARD_FLOOR));
 }
 
-// Which stage lost a group the reference says applies. Every reject reason the policy can write
-// has an arm here; without one, a gated or storage-dropped group would be blamed on the judge.
+// Which stage lost a group the reference says applies. The Record is checked by the compiler against
+// the reasons pipeline/policy.ts can write, so a new policy rule does not type-check until its
+// rejections have a cause here - otherwise its misses would silently be blamed on the judge.
+// When a group's decisions carry several causes, the earliest in PRECEDENCE is the one reported.
+const CAUSE: Record<NonNullable<Decision['rejectReason']>, Cause> = {
+  below_cutoff: 'below_cutoff',
+  entity_gate: 'entity_gate',
+  storage_moved: 'policy_moved',
+  storage_sibling_weaker: 'policy_moved',
+  judge_rejected: 'judge_rejected',
+};
+const PRECEDENCE: Cause[] = ['below_cutoff', 'entity_gate', 'policy_moved', 'quote_not_found', 'judge_rejected'];
+
 function causeOf(ds: Decision[]): Cause {
-  const reasons = new Set(ds.map((d) => d.rejectReason));
-  if (reasons.has('below_cutoff')) return 'below_cutoff';
-  if (reasons.has('entity_gate')) return 'entity_gate';
-  if (reasons.has('storage_moved') || reasons.has('storage_sibling_weaker')) return 'policy_moved';
-  if (ds.some((d) => d.flags.includes('quote_not_found'))) return 'quote_not_found';
-  return 'judge_rejected';
+  const causes = new Set(ds.flatMap((d) => [CAUSE[d.rejectReason ?? 'judge_rejected'], ...(d.flags.includes('quote_not_found') ? ['quote_not_found' as const] : [])]));
+  return PRECEDENCE.find((c) => causes.has(c))!;
 }
 
 export async function diff(pipeline: Map<string, Group>, reference: Map<string, Group>, result: { accepted: Decision[]; rejected: Decision[]; card: Card }): Promise<Mismatch[]> {
   const out: Mismatch[] = [];
-  const judged = new Map<string, Decision[]>();
-  for (const d of [...result.accepted, ...result.rejected]) judged.set(d.group, [...(judged.get(d.group) ?? []), d]);
+  const judged = Map.groupBy([...result.accepted, ...result.rejected], (d) => d.group);
 
   for (const [key, g] of reference) {
     if (pipeline.has(key)) continue;

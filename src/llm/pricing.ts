@@ -14,7 +14,7 @@ import { z } from 'zod';
 export const Usage = z.object({ input: z.number(), cached: z.number(), output: z.number(), reasoning: z.number() });
 export type Usage = z.infer<typeof Usage>;
 
-export const PRICING: Record<string, { input: number; cached: number; output: number }> = {
+const PRICING: Record<string, { input: number; cached: number; output: number }> = {
   'gpt-6-luna': { input: 0.1, cached: 0.01, output: 0.5 },
   'gpt-6-sol': { input: 2, cached: 0.2, output: 10 }, // priced the one-off reference build, not the pipeline
   'gpt-5.6-luna': { input: 0.2, cached: 0.02, output: 1.2 }, // the first full run, kept for the comparison in the README
