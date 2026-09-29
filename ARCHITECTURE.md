@@ -39,7 +39,7 @@ flowchart LR
     API[Fastify API<br/>jobs, results, sync tag]
     JOBS[Job runner<br/>table-backed queue]
     TAG[tag(manufacturer_id)<br/>the pipeline, section 3]
-    LLM[LLM client<br/>live / replay / stub<br/>cache + usage]
+    LLM[LLM client<br/>live / replay<br/>cache + usage]
   end
 
   subgraph store [artifacts/tagging.sqlite]
@@ -81,14 +81,14 @@ Three things to notice:
 ```mermaid
 flowchart TD
   A[manufacturer_id] --> B[Load name, domain, markdown]
-  B --> C0{Stored result with same<br/>content hash + taxonomy hash + prompt versions?}
+  B --> C0{Stored result with same<br/>content hash + taxonomy hash + every setting and prompt text?}
   C0 -- yes --> Z[Return cached result]
   C0 -- no --> C[Step 1 Clean<br/>drop blank / duplicate lines, keep image alt text, drop placeholder URLs]
-  C --> D[Step 2 Chunk<br/>~1000 chars on paragraph boundaries, keep heading]
+  C --> D[Step 2 Chunk<br/>~1000 chars, a heading starts a new chunk]
   D --> E[Step 3 Read everything<br/>windows of ~10K tokens -> luna at low effort extracts products + quotes per window]
   E --> G[Step 5 Merge into the card<br/>entity type, products + quotes, capabilities + quotes, storage words]
   G --> G1[Check: every quote is in the text that was sent]
-  G1 --> H[Step 6 Shortlist<br/>per phrase: dense + BM25 fused, top-8; union, sibling expansion, cap max(120, 3 x phrases)]
+  G1 --> H[Step 6 Shortlist<br/>per phrase: dense + BM25 fused, top-8; union, sibling expansion, cap max(120, 3 x phrases), at most 600]
   H --> I[Step 7 Judge, LLM call 2 in batches of ~30<br/>per candidate: applies, confidence; quote + reason when applies]
   I --> J[Step 8 Validate<br/>id in shortlist? quote in evidence?]
   J --> K[Step 9 Policy<br/>storage rule, cutoff, entity type gate, status]
@@ -115,7 +115,7 @@ What it does not do: it does not decide what is a product. That is the model's j
 
 ### Step 2. Chunk
 
-Cut the cleaned text into pieces of about 1,000 characters, splitting on headings and blank lines, merging small pieces, and not splitting mid-sentence when avoidable. Each chunk remembers its position and the nearest heading above it.
+Cut the cleaned text into pieces of about 1,000 characters, splitting on headings and blank lines, merging small pieces, and not splitting mid-sentence when avoidable. Each chunk remembers its position in the cleaned text (the judge's evidence uses it to always include the site head).
 
 Why ~1,000: small enough that one chunk is about one topic (so its score in step 4 means something), big enough that a product description with its context fits. Windows in step 3 are built from whole chunks so a product description is never cut in half.
 
@@ -160,7 +160,7 @@ For each product and capability phrase from the card, two searches run and are f
 
 The two ranked lists are merged with reciprocal rank fusion (a category near the top of either list ranks high; near the top of both ranks highest). Top 8 per phrase. Union everything, keep the best fused score per category and remember which phrase matched it and by which path. Then sibling expansion: for every candidate, add all of its storage / qualifier siblings (Frozen X, Refrigerated X, Shelf Stable X, and bare X). This puts the contrast in front of the judge so the storage rule can be applied with the definitions visible.
 
-Cap at max(120, 3 x card phrases) by best score, never splitting a sibling group: a group that does not fit is skipped whole and a smaller one behind it still gets in. Measured mean over the 30 manufacturers: 140 candidates (`artifacts/query-mode-study.json`).
+Cap at max(120, 3 x card phrases), and never above 600 (20 judge batches, so no site can pull in the whole taxonomy; the largest shortlist over the 30 is 527 and the largest card 196 phrases, so the ceiling never binds), by best score, never splitting a sibling group: a group that does not fit is skipped whole and a smaller one behind it still gets in. Measured mean over the 30 manufacturers: 140 candidates (`artifacts/query-mode-study.json`).
 
 The cap, not `k`, is what decides retrieval recall, and buying more of it does not pay (`artifacts/retrieval-study.json`): raising `k` from 8 to 24 alone changes nothing, because the extra candidates compete for the same slots, while raising the cap to 600 at k=16 cuts the groups the judge never sees from 22 to 6. Run live, that converted 13 of them into true positives and brought 20 new false positives with them: precision 95.0% to 89.9%, F1 86.0% to 85.7%, cost $510 to $795 per 30,000. Rejected.
 
@@ -184,14 +184,16 @@ The prompt states the two rules: tag only when the site names the product type (
 
 ### Step 9. Policy (code, no model)
 
-- Storage rule: a storage-qualified category passes only if the product on the card has that storage word or the quote contains one. If a sibling in the same group *is* evidenced, the site did state a storage state for this product, so the unevidenced variants are simply dropped (`storage_sibling_weaker`). Otherwise, if the bare sibling exists, the verdict moves to it — the bare one, found by `baseName(name) === name`, not merely one without a storage prefix, because the taxonomy also qualifies by Diet, Plant Based and Ready To Drink and "Diet Orange" is not the unqualified category. If only qualified siblings exist (285 base names in this taxonomy exist only in qualified form: Mayonnaise, Frozen Dumpling ...), keep the strongest at its judge confidence and mark it `storage_inferred: true` with the reason. An earlier draft multiplied the confidence by 0.7 here; that would have let the cutoff below silently drop a fifth of the taxonomy.
+- Storage rule: a storage-qualified category passes only if the product on the card has that storage word or the quote contains one. Storage words are matched as whole words in any script (JavaScript's `\b` is ASCII-only, so "plat surgelé" and "produit réfrigéré" never counted before), in English, German and French. "Fresh" is deliberately not one of them, and since the profile prompt does list it, a card product whose own quote says "fresh" and names no storage word is not taken as evidence either. If a sibling in the same group *is* evidenced, the site did state a storage state for this product, so the unevidenced variants are simply dropped (`storage_sibling_weaker`). Otherwise, if the bare sibling exists, the verdict moves to it — the bare one, found by `baseName(name) === name`, not merely one without a storage prefix, because the taxonomy also qualifies by Diet, Plant Based and Ready To Drink and "Diet Orange" is not the unqualified category. If only qualified siblings exist (285 base names in this taxonomy exist only in qualified form: Mayonnaise, Frozen Dumpling ...), keep the strongest at its judge confidence and mark it `storage_inferred: true` with the reason. An earlier draft multiplied the confidence by 0.7 here; that would have let the cutoff below silently drop a fifth of the taxonomy.
 - Cutoff: return `applies && judge_confidence >= cutoff`, initial cutoff 0.6. Self-reported confidence is known to be poorly calibrated, and log-probabilities are not available with structured outputs, so the cutoff is not trusted as-is: every accepted verdict is binned by confidence against the reference set and the cutoff is read off that table (no verdict below 0.7, identical F1 from 0.5 to 0.7, so 0.6 stays). The retrieval score is stored beside the confidence for the same reason. Below-cutoff verdicts are stored as `rejected` for inspection.
 - Entity gate: for `marketplace` / `investor` / `distributor` the default policy returns an empty list with status `not_a_manufacturer` — the three types both prompts already say do not own what they list, fund or resell. Keychain confirmed the empty answer is the correct one (README question 2); `NON_MANUFACTURER_POLICY=tag` flips it.
 - Status: `tagged`, `no_confident_category`, `not_a_manufacturer`, `insufficient_content`, `error`.
 
 ### What gets stored
 
-manufacturer id, result key (manufacturer id + cleaned-content hash + taxonomy hash + prompt versions + model ids + query mode + cutoff + entity policy — everything that can change the answer), status, entity type, accepted categories (id, confidence, quote, reason, matched-by), rejected ones with reasons, the card, evidence stats (`rawChars`, `cleanedChars`, `chunks`, `windows`, `judgeEvidenceChars`, `quotes.{exact,fuzzy,none}`, `shortlist`, `batches`, `unknownIds`, `repeatedIds`), usage per call and total (input, cached, output, reasoning tokens), cost in dollars, versions, duration.
+manufacturer id, result key (manufacturer id + cleaned-content hash + taxonomy hash + `versions`: every setting in `src/config.ts` except the key, the mode, file paths and concurrency, plus a hash of the prompt files' text — built by leaving out, not by listing in, after a hand-kept list twice missed settings; code is not in it, so a code change is re-tagged with `--force`), status, entity type, accepted categories (id, confidence, quote, reason, matched-by), rejected ones with reasons, the card, evidence stats (`rawChars`, `cleanedChars`, `chunks`, `windows`, `judgeEvidenceChars`, `quotes.{exact,fuzzy,none}`, `shortlist`, `batches`, `unknownIds`, `repeatedIds`), usage per call and total (input, cached, output, reasoning tokens), cost in dollars (every billed attempt, charged as it returns, so a run that fails halfway is stored with what it cost), versions, duration.
+
+A failed run is stored too, under its own key (`<result key>:error`): kept for diagnosis, never served, retried on the next call, and unable to overwrite an answer already stored for the same input. `results.current(manufacturer, versions)` is the single rule for "the current answer" — rows of the current `versions` only, an answer before a failure, newest first — and both the API and the report read through it.
 
 ## 4. Data model
 
@@ -235,7 +237,7 @@ erDiagram
 
 Source tables (`category`, `manufacturer`, `manufacturer_scraped_data`) are never written. Everything else lives in `artifacts/tagging.sqlite`.
 
-## 5. LLM client: live, replay, stub
+## 5. LLM client: live, replay
 
 ```mermaid
 flowchart LR
@@ -246,10 +248,11 @@ flowchart LR
   C -- replay --> F{in artifacts/replay?}
   F -- yes --> R
   F -- no --> X[ReplayMissError naming the key]
-  C -- stub --> S[canned response from the test]
 ```
 
-Only `live` is given a transport, so replay cannot reach the network whatever `OPENAI_API_KEY` holds: a miss is an error, never a surprise bill. Cache rows are written with `insert or ignore` — a key is the whole request, so an existing row already answers it, and a second process cannot rewrite evidence that has been exported.
+Tests fake the model where a real provider would plug in, as a `Transport` (`test/fake-llm.ts`), so they run through the same parse, retry, cache and cost path as a live call; there is no third mode that skips the cache.
+
+Only `live` is given a transport, so replay cannot reach the network whatever `OPENAI_API_KEY` holds: a miss is an error, never a surprise bill. A model with no price fails before the transport is called, not after it has billed. Cache rows are written with `insert or ignore` — a key is the whole request, so an existing row already answers it, and a second process cannot rewrite evidence that has been exported. The one exception is a cached row that no longer parses (an output schema changed without a prompt-version bump): the fresh answer replaces it, or every later run would pay for the same call again.
 
 A parse failure is retried once with the validation error appended to the prompt; a second failure is a typed error and the manufacturer's result is stored as `error`, never half-tagged.
 
@@ -265,32 +268,37 @@ Where the money goes (measured, live run of all 30 on `gpt-6-luna`, `artifacts/r
 | One model, effort dialled down | `gpt-6-luna` for every pipeline call; reasoning effort low for the window reads and the merge, default for the judge; the judge would move to a bigger model only if the cause breakdown said the judge is the weak link, and it says the opposite: 60 of the 84 misses are the judge reading a definition too narrowly, which a prompt change addresses more cheaply (tested, see the README's rejected v3) | report |
 | Evidence selection (built, measured, removed) | read a scored subset instead of the whole site | `artifacts/budget-study.json`: loses 3x the noise floor at every budget; would have saved $0.27 to $0.35 per 30 profiles. See step 3 |
 | Trimmed definitions in the judge | 300 chars instead of ~1,700 per candidate | fixed |
-| Shortlist cap and judge batching | bounds the judge call; batches share a prefix meant for the prompt cache | cap max(120, 3 x card phrases), batches of ~30; measured cache hit share 0%, see above |
+| Shortlist cap and judge batching | bounds the judge call; batches share a prefix meant for the prompt cache | cap max(120, 3 x card phrases) with a hard ceiling of 600, batches of ~30; measured cache hit share 0%, see above |
 | Cache by prompt hash | re-runs of unchanged prompts are free; replay for reviewers | built in |
 | Result cache by content hash | an unchanged site is never re-tagged | built in |
 | OpenAI Batch API | 50% off for a full-base run | documented as a lever, not built |
 
-When it stops: the budget is full, the shortlist is capped, one retry at most. There is no loop that can run away.
+When it stops: every window is read once, the shortlist is capped (at most 600 candidates, 20 judge batches), one retry at most. There is no loop that can run away, and no manufacturer can cost more than its site's windows plus 20 batches.
 
 ## 7. Service contract
 
 ```
 POST /v1/tagging-jobs                 { manufacturer_ids?: [..], all?: true, force?: false }
-                                      -> 202 { job_id, manufacturers }
+                                      -> 202 { job_id, manufacturers }  (repeated ids counted once)
+                                      -> 400 { error: "unknown_manufacturer", manufacturer_ids }
+                                         if any id is not in the dataset; nothing is queued
 GET  /v1/tagging-jobs/:id             -> 200 { job_id, status, counts: { total, pending, done, failed },
                                                cost_usd, manufacturers: { "<id>": { status, result_key,
                                                status_detail, cost_usd, error? } }, created_at, updated_at }
                                       -> 404 { error: "job_not_found" }
-GET  /v1/manufacturers/:id/categories -> 200 stored result, or 404 { error: "not_tagged" }
+GET  /v1/manufacturers/:id/categories -> 200 the current pipeline's answer; 502 with the same body if
+                                      its last attempt failed and no answer exists; 404 { error:
+                                      "not_tagged" }, also when only another version's answer exists
 POST /v1/manufacturers/:id/tag        ?wait=true runs now -> 200 result (502 with the same body on a
                                       pipeline error); without wait -> 202 { job_id };
                                       unknown id -> 404 { error: "unknown_manufacturer" }
 GET  /healthz                         -> 200 { ok, mode }
+any route, Host not localhost or a browser Origin from another site -> 403 { error: "forbidden" }
 ```
 
 Why this shape: the platform "runs across the full manufacturer base", which is a job, not 30,000 blocking calls. One sync endpoint exists for the one-off case and for the demo. Results are idempotent on the result key (see step 9), so calling twice is safe and cheap, every result says which versions produced it, and two callers asking for the same manufacturer at the same moment share one pipeline run rather than paying twice.
 
-The job runner is a table-backed loop inside the process: pending jobs resume after a restart, and a job that fails outside its per-item guard is marked `failed` while the loop drains the rest. If Keychain has a queue, the contract does not change. Its one known limit is scale: a job keeps its per-manufacturer state in a single `items` column, which is fine for 30 and would be a few megabytes rewritten per completion at 30,000 — a `job_items` table is the fix, and it is not built.
+The job runner is a table-backed loop inside the process: pending jobs resume after a restart, and a job that fails outside its per-item guard is marked `failed` while the loop drains the rest. If Keychain has a queue, the contract does not change. A job can never be bigger than the dataset (ids are deduplicated and checked before anything is queued), and the loop yields to the event loop after every manufacturer, so a job of already-stored answers cannot hold the server. Its one known limit is scale: a job keeps its per-manufacturer state in a single `items` column, which is fine for 30 and would be a few megabytes rewritten per completion at 30,000 — a `job_items` table is the fix, and it is not built.
 
 ## 8. The reference set and how the pipeline is scored
 
@@ -315,7 +323,7 @@ What the report leaves behind: `artifacts/report.md` (accuracy, misses by cause 
 |---|---|---|
 | Which lines are junk | code | deterministic, free, measured |
 | Which chunks to read | nobody: everything is read. A selection lever was built, measured and removed (step 3) | correctness is graded, and a dropped chunk is unrecoverable |
-| What the company makes, whether it is a manufacturer | LLM (profile) | needs reading comprehension; guarded by the quote check |
+| What the company makes, whether it is a manufacturer | LLM (profile) | needs reading comprehension. The products are guarded by the quote check; the entity type is not (no quote is asked for it), which is why the five `not_a_manufacturer` answers are flagged for a human in the README |
 | Which categories to consider | embeddings + exact names | fast, and the judge never sees anything else |
 | Whether a category applies | LLM (judge) | needs the definition and the evidence side by side |
 | Whether the id is real, whether the quote is real | code | structural guarantees, no trust needed |
@@ -330,12 +338,13 @@ Three layers keep the model from making basic mistakes. Guards are code that run
 
 | Guard | Mistake it stops | Where | What it leaves behind |
 |---|---|---|---|
-| Quote must be in the text sent | the model "remembers" a product from its training instead of reading the site, or invents a quote | step 5, after the merge | `evidence.quotes.{exact,fuzzy,none}` per result (2,452 / 22 / 8 over the 30) |
+| Quote must be in the text sent | the model "remembers" a product from its training instead of reading the site, or invents a quote | step 5, after the merge | `evidence.quotes.{exact,fuzzy,none}` per result (2,452 / 22 / 8 over the 30). A quote with no word in it ("...") counts as not found. What it does not prove: that the quote names the category. A one-word quote is valid (most are product-list items), so a page written to steer the model could get past it; README "With more time" |
 | Id must be in the batch | the judge names a category it was never shown | step 8 | `evidence.unknownIds` and `evidence.repeatedIds` (0 / 0 over the 30) |
 | `applies` needs a found quote | the judge says yes without evidence | step 8 | verdict flipped to no, reason `quote_not_found`, counted |
 | Storage variant needs a storage word | Frozen X claimed when the site only says X | step 9 | verdict moved to the bare sibling, or `storage_inferred: true` with reason |
 | One retry, then `error` | malformed JSON silently becomes a half-tagged manufacturer | LLM client, section 5 | `status: error` carrying both raw outputs in the message, the tokens already spent still charged, and the row retried on the next call rather than served back |
-| Fixed bounds | a runaway loop or an unbounded prompt | section 6 | window count, shortlist cap max(120, 3 x phrases), batch size ~30, one retry max |
+| Fixed bounds | a runaway loop or an unbounded prompt | section 6 | window count, shortlist cap max(120, 3 x phrases) up to 600, batch size ~30, one retry max |
+| Local-only API | a web page starting a billed run through the user's browser | `api/server.ts` | `403` for a foreign Host or Origin |
 
 **Layer 2: guardrails (what the model may decide)**
 

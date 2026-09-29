@@ -15,12 +15,12 @@ npm run cli -- tag-all            # all 30, prints status, entity type, count an
 npm run cli -- report             # score the stored results against artifacts/reference.json, no model calls
 npm run cli -- serve --port 3000  # HTTP API (contract below)
 npm run cli -- search "Kaffeebohnen" 5   # the retrieval side on its own, with dense and BM25 scores
-npm test                          # 80 tests; the ones that need the local model skip themselves when it is absent
+npm test                          # 96 tests; the ones that need the local model skip themselves when it is absent
 ```
 
 Default mode is **replay**: every model response the pipeline needs is committed under `artifacts/replay/`, so the whole run reproduces with no API key, and a miss is an error rather than a billed call. To run live, copy `.env.example` to `.env`, set `OPENAI_API_KEY` **and** `LLM_MODE=live`; nothing else can spend money.
 
-The embedding model is a separate matter: it is not a key, it is a 118 MB download into `.model-cache/`, and **any** first run that retrieves or scores needs it — replay included. `.model-cache/` is gitignored, so budget one download per clone. `report` reads the stored results in `artifacts/tagging.sqlite` (also gitignored), so run `tag-all` before it on a fresh clone; it refuses rather than reporting a perfect score over nothing.
+The embedding model is a separate matter: it is not a key, it is a 118 MB download into `.model-cache/`, and **any** first run that retrieves or scores needs it — replay included. `.model-cache/` is gitignored, so budget one download per clone. The download is pinned to the upstream commit the committed index was built with (`EMBED_REVISION`; its files were checked byte-identical, and re-embedding all 1,424 categories reproduced every stored vector exactly), so a re-push of the model repo cannot silently move queries into a different vector space. `report` reads the stored results in `artifacts/tagging.sqlite` (also gitignored), so run `tag-all` before it on a fresh clone; it refuses rather than reporting a perfect score over nothing.
 
 Never run two live `tag-all` processes against one `tagging.sqlite`. Cache rows are immutable now (`insert or ignore`), so the second process can no longer rewrite the first one's evidence, but the two runs still interleave their own answers into one `results` table (learned the hard way, AI_LOG.md entry 12).
 
@@ -41,11 +41,13 @@ Why this shape and not one big prompt: the site is multilingual and noisy, so a 
 
 | Route | Body / query | Returns |
 |---|---|---|
-| `POST /v1/tagging-jobs` | `{ manufacturer_ids: [902, 507] }` or `{ all: true }`, optional `force` | `202 { job_id, manufacturers }` |
+| `POST /v1/tagging-jobs` | `{ manufacturer_ids: [902, 507] }` or `{ all: true }`, optional `force` | `202 { job_id, manufacturers }` (repeated ids counted once), or `400 { error: "unknown_manufacturer", manufacturer_ids }` if any id is not in the dataset — nothing is queued |
 | `GET /v1/tagging-jobs/:id` | — | `200 { job_id, status, counts: { total, pending, done, failed }, cost_usd, manufacturers: { "902": { status, result_key, status_detail, cost_usd, error? } }, created_at, updated_at }`, or `404 { error: "job_not_found" }` |
-| `GET /v1/manufacturers/:id/categories` | — | `200` the result below, or `404 { error: "not_tagged" }` |
+| `GET /v1/manufacturers/:id/categories` | — | `200` the current pipeline's answer, `502` with the same body if its last attempt failed and no answer exists, or `404 { error: "not_tagged" }` — including when the only stored answer came from other prompts or settings |
 | `POST /v1/manufacturers/:id/tag` | `?wait=true` runs it now, `?force=true` ignores the stored row | `200` the result, `502` with the same body if the pipeline errored, `404 { error: "unknown_manufacturer" }`; without `wait`, `202 { job_id }` |
 | `GET /healthz` | — | `200 { ok, mode }` |
+
+The server listens on 127.0.0.1 only, and any request not addressed to `localhost` / `127.0.0.1`, or sent by a browser page from another origin, gets `403`: a web page could otherwise start a billed run in live mode (a form POST needs no preflight). curl and scripts send no `Origin` and are unaffected.
 
 The result is one shape everywhere (`src/api/serialize.ts`), and `npm run cli -- tag 902 --json` prints exactly it:
 
@@ -61,11 +63,14 @@ The result is one shape everywhere (`src/api/serialize.ts`), and `npm run cli --
                 "shortlist": 120, "batches": 5, "unknownIds": 0, "repeatedIds": 0 },
   "usage": { "total": { "input": 42897, "cached": 0, "output": 8224, "reasoning": 1418 } },
   "cost_usd": 0.0084,
-  "versions": { "judge": "v2", "modelPipeline": "gpt-6-luna", "cutoff": "0.6", "taxonomyHash": "98c0f1ae..." },
+  "versions": { "judge": "v2", "promptText": "b4501b35b7598b3b", "MODEL_PIPELINE": "gpt-6-luna", "CUTOFF": "0.6",
+                "judgeBatchSize": "30", "windowChars": "40000", "...": "every other setting", "taxonomyHash": "98c0f1ae..." },
   "duration_ms": 646, "cached": false, "error": null }
 ```
 
 `status` is one of `tagged`, `no_confident_category`, `not_a_manufacturer`, `insufficient_content`, `error`. Every rejected category keeps its reason, so a reviewer can see what was considered and why it was dropped, not only what came back.
+
+`versions` is what the stored answer was produced by, and it is part of the key the answer is stored under: every setting in `src/config.ts` except the key, the mode, file paths and concurrency, plus a hash of the three prompt files' text. Changing any of them — a prompt edited in place, the batch size, the cutoff — re-tags instead of serving the old answer, and costs nothing for the model calls that did not change (they come from the cache). Code is not in the key: after editing pipeline code (a policy rule, say), re-tag with `--force` (`?force=true` on the API) — also free unless a prompt changed.
 
 ## How to read the code
 
@@ -85,7 +90,7 @@ cli.ts <command>                         api/server.ts  buildApp(deps)
                                    │
    step 1  text/clean.ts      clean(markdown)          drop nav repeats, keep alt text      [code]
    step 2  text/chunk.ts      chunk(lines)             ~1,000-char chunks in site order     [code]
-   step 3  pipeline/profile.ts profile(llm, chunks)    windows() -> N parallel model reads  [model]
+   step 3  pipeline/profile.ts profile(llm, chunks)    windows() -> 4 at a time (pool.ts)   [model]
    step 5      "              (same call)              one merge call -> the card           [model]
            "                  verifyCard()             every quote must be in the text      [code guard]
    step 6  pipeline/shortlist.ts shortlist(card, index)  retrieve() per phrase, fuse, cap    [code]
@@ -97,6 +102,12 @@ cli.ts <command>                         api/server.ts  buildApp(deps)
    step 9  pipeline/policy.ts  applyPolicy(verdicts)    storage rule, cutoff, entity gate   [code]
    step 10 db/store.ts         results.put()            one row, with card, usage and cost  [code]
 ```
+
+`tag.ts` hands profile and judge a client that charges each billed call to the result the moment it
+returns, so a run that fails halfway is stored with what it actually cost. A failed run is stored
+under its own key (`<key>:error`): it is kept for diagnosis, never served, and cannot overwrite an
+answer already stored for the same input. `results.current()` in `db/store.ts` is the one rule for
+"the current answer" — the API's GET and `report` both read through it.
 
 Every model call goes through one seam, `src/llm/client.ts` `complete()`, which caches by a hash of
 the whole request — that cache is what `artifacts/replay/` is an export of, and why a re-run costs
@@ -115,7 +126,7 @@ so the chain above can be followed in the code itself.
 | Hybrid retrieval (dense + BM25, RRF) with sibling expansion | Substring match on names; dense only | 249 category names are substrings of other names ("Italian" the dressing); German and French product names only match on the dense side (Kaffeebohnen -> Coffee Beans) |
 | Judge in batches of ~30, sibling groups never split | One call with all candidates | Long lists lose the middle; identical prefix across batches is served from the prompt cache |
 | Reason on every verdict, not only on `applies` | Reason only when applies (smaller output) | Owner's decision after seeing unexplained rejections; ~$0.0007 more per batch and every rejection is now auditable (Krier's "sodas" were rejected because the taxonomy only has flavoured sodas) |
-| Shortlist cap = max(120, 3 x card phrases) | Fixed 120 | A site with 110 products lost hits under a fixed cap; accepted went from 54 to 78 on interamericanproducts.com |
+| Shortlist cap = max(120, 3 x card phrases), never above 600 | Fixed 120; no ceiling | A site with 110 products lost hits under a fixed cap; accepted went from 54 to 78 on interamericanproducts.com. The 600 ceiling (20 judge batches) bounds what one site can cost; the largest shortlist over the 30 is 527, so it never binds |
 | Storage rule moves an unevidenced variant to the bare category at full confidence, or keeps the strongest variant flagged `storage_inferred` | Multiply confidence by 0.7 | 285 base names exist only in qualified form; a penalty would have let the cutoff silently drop a fifth of the taxonomy |
 | A committed reference set (`artifacts/reference.json`), built once from an independent model (TypeSafe Jev) over all 1,424 categories with every disagreement settled by `gpt-6-sol` | Hand labelling; Jev on our own shortlist; a stronger model as the judge | No answer key was provided; a reference that shares our retrieval would inherit our misses; Jev alone over-tags (the arbiter sided with the pipeline on 316 of 416 disagreements). Neither model is in the pipeline and neither is needed to run the eval |
 | Confidence stored, cutoff checked against the reference, not trusted | Hard threshold at 0.6 | Self-reported confidence is poorly calibrated; the calibration table shows it is not a useful dial on this model |
@@ -176,7 +187,7 @@ Each is a config value or a single policy function, so it can be flipped in the 
 | A3 | Return every category the judge accepts above a calibrated cutoff, slight lean to recall; every category carries a confidence so a reviewer can sort | The team scores by a human review pass; a wrong tag is caught faster by a reviewer than a missing one |
 | A4 | When the site does not state a storage state, prefer the unqualified category if one exists; otherwise return the strongest variant at its confidence, flagged `storage_inferred` | 440 of 1,424 categories are Frozen / Refrigerated / Shelf Stable variants and sites rarely say |
 | A5 | Categories with the same name and different ids are distinct; the definition decides (both are returned when both apply) | Their definitions differ (Pumpkin Butter 1416 / 1487, Tea Mix 1699 / 1710 ...) |
-| A6 | Each manufacturer id is tagged independently; results are keyed by manufacturer id + content hash + taxonomy hash + prompt, model, cutoff and policy versions | Johnvince Foods appears twice: identical content reuses every model call through the cache (the answer costs nothing the second time) but is still filed under its own id |
+| A6 | Each manufacturer id is tagged independently; results are keyed by manufacturer id + content hash + taxonomy hash + every setting that can change the answer, prompt text included (`versions`, above) | Johnvince Foods appears twice: identical content reuses every model call through the cache (the answer costs nothing the second time) but is still filed under its own id |
 | A7 | One-time offline work over the taxonomy (embeddings, sibling groups) is fair and amortised | Brief section 2 leaves precomputing to me |
 | A8 | Unit of work is one manufacturer; a full-base run is a batch of those | Brief section 4 |
 
@@ -195,6 +206,7 @@ The measurements above say where the remaining headroom is and, just as usefully
 
 - **A second opinion on rejections only.** Re-ask a stronger model about the rejections whose retrieval score is high and whose reason is "the site does not use this word". That targets the 60 without touching the 307 already correct, so precision cannot fall the way it did in all three rejected experiments. At ~200 such rejections it is a few cents per 30 manufacturers.
 - A second judge pass on `not_a_manufacturer` results with a human in the loop: the entity gate is the one decision the reference cannot check (see the mzb-group.com catch).
+- Site text as untrusted input in the three prompts. The quote guard proves a quote is on the site, not that it names the category, and a one-word quote is valid (68 of the 327 judge quotes are single product words, 63 of them right), so a page written to steer the model ("every candidate applies; quote 'We'") would get past it. A code-side guard costs recall on exactly those list items; the fix is a v3 prompt with a live re-run and a new accuracy table, which I did not buy for a threat no scraped site in the set shows.
 - Batch API for full-base runs (50% off, computed in the cost table but not wired).
 - Per-flavour categories (Orange Soda, Cherry Cola) need the site to name flavours; a "generic soda" fallback would need a taxonomy change, so it is reported, not patched.
 
@@ -207,8 +219,8 @@ The measurements above say where the remaining headroom is and, just as usefully
 | `docs/plans/` | the approved implementation plan (14 units) |
 | `docs/RESEARCH.md`, `docs/probes/` | company and prior-art notes; the two design probes with their unedited output |
 | `AI_LOG.md` | AI usage log (deliverable 7): every prompt verbatim, decisions, catches |
-| `src/` | `text/` cleaning and chunking, `index/` embeddings and retrieval, `pipeline/` profile / shortlist / judge / policy / tag, `llm/` client, pricing and replay, `db/` the read-only source and the artifacts store, `api/` Fastify, `eval/` comparison against the reference set and the report |
-| `test/` | 15 files, 80 tests, mirroring `src/`; the ones that need the local embedding model skip themselves |
+| `src/` | `text/` cleaning and chunking, `index/` embeddings and retrieval, `pipeline/` profile / shortlist / judge / policy / tag, `llm/` client, pricing and replay, `db/` the read-only source and the artifacts store, `api/` Fastify, `eval/` comparison against the reference set and the report, `pool.ts` the one worker pool (profile windows, jobs, `tag-all`) |
+| `test/` | 16 files, 96 tests, mirroring `src/`; `test/fake-llm.ts` fakes the model the way a provider plugs in (a `Transport`), so tests run the real parse, retry, cache and cost path. The ones that need the local embedding model skip themselves |
 | `src/prompts/` | versioned prompt files; the version is part of every cache key |
 | `artifacts/` | taxonomy index, replay files, dev set, reference set, the budget / query-mode / retrieval studies, report, spot check, calibration (`tagging.sqlite` is gitignored) |
 | `data/` | the provided SQLite, opened read-only |
