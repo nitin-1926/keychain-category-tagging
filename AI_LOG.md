@@ -1,8 +1,19 @@
 # AI Usage Log
 
-Entries were written during the work. Prompts are quoted in my words, trimmed for length.
+Entries were written during the work. Prompts in entries 1 to 3 are trimmed; from entry 4 on they are verbatim apart from typo fixes and a few trims for length, and long pasted text is summarised in [brackets].
 
 Tools used: claude.ai (chat, first read of the brief and data), Claude Code (repo work).
+
+**Catches, for a quick read** (AI output that looked right and was not):
+
+- Entry 1: the first read of the data said two companies had no valid category; `Perfume` and `Powder Supplements` exist.
+- Entry 5: asked for a project folder, the AI wrote a complete, plausible design that nobody had decided.
+- Entry 8: a review question was treated as a directive and the plan rewritten, with a model I had not chosen.
+- Entry 12: the live run called a coffee group with its own roasting plants an `investor` with no products, and the evals would have scored it as agreement.
+- Entry 15: an accuracy reported a day earlier (P 97.5%, R 88.0%) was inflated by a scoring bug; the real figure is P 95.0%, R 78.5%.
+- Entry 16: replay mode, documented as unable to spend, made a live call when a key was present.
+- Entry 18: an earlier fix did not do what its log entry said; `cache export` could delete `package.json`.
+- Entry 19: a regression test that still passed with its fix removed.
 
 ### 1. First read of the brief and the database  (2026-09-21, claude.ai)  [CATCH]
 
@@ -84,7 +95,7 @@ Follow-ups:
 
 **On point 1 (Jev):** AI's view, which I am weighing in the grill session: do not tune the pipeline to match Jev. Jev is not ground truth, so matching it copies its mistakes, and Keychain scores against their own labels. Better use: run Jev once over the same candidates, store it, and use the *disagreements* between Jev and my pipeline to decide which manufacturer/category pairs I check by hand. Tuning is against my hand-checked set. Decision: pending, see next entry.
 
-Note: entries 1 to 3 have trimmed prompts; from entry 4 on they are verbatim.
+Note: entries 1 to 3 have trimmed prompts; from entry 4 on they are verbatim, with the exceptions named in the header.
 
 ### 6. Design grill session  (2026-09-21, Claude Code, `grill-me` skill)
 
