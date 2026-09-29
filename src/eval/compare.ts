@@ -3,8 +3,7 @@
 // Called by: eval/report.ts, once per manufacturer. Calls: index/embed.ts (only to answer "was this
 // category on the card at all?") and index/taxonomy.ts baseName() for grouping.
 
-import { config } from '../config.js';
-import { dot, embed } from '../index/embed.js';
+import { dot, embedQueries } from '../index/embed.js';
 import { baseName } from '../index/taxonomy.js';
 import type { Decision } from '../pipeline/policy.js';
 import type { Card } from '../pipeline/profile.js';
@@ -35,8 +34,11 @@ export function pipelineGroups(accepted: Decision[]): Map<string, Group> {
   return groups;
 }
 
+// Category name vs card phrase cosine above which the product counts as "on the card".
+const ON_CARD_FLOOR = 0.85;
+
 // Was this category on the card at all? Exact token overlap with a card phrase, or a close embedding.
-export async function onCard(names: string[], card: Card, floor = config.onCardFloor): Promise<boolean> {
+export async function onCard(names: string[], card: Card): Promise<boolean> {
   const phrases = [...card.products, ...card.capabilities].map((p) => p.name);
   if (!phrases.length) return false;
   const tokens = (s: string) => new Set(normalize(s).split(/[^\p{L}\p{N}]+/u).filter((t) => t.length > 2));
@@ -44,8 +46,8 @@ export async function onCard(names: string[], card: Card, floor = config.onCardF
     const nt = tokens(baseName(n));
     if ([...nt].length && phrases.some((p) => [...nt].every((t) => tokens(p).has(t)))) return true;
   }
-  const [vn, vp] = await Promise.all([embed(names.map((n) => `query: ${n}`)), embed(phrases.map((p) => `query: ${p}`))]);
-  return vn.some((a) => vp.some((b) => dot(a, b) >= floor));
+  const [vn, vp] = await Promise.all([embedQueries(names), embedQueries(phrases)]);
+  return vn.some((a) => vp.some((b) => dot(a, b) >= ON_CARD_FLOOR));
 }
 
 // Which stage lost a group the reference says applies. Every reject reason the policy can write

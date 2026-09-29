@@ -6,12 +6,13 @@
 // Reading order below: BM25, then reciprocal rank fusion, then sibling grouping, then the index
 // object that ties the three together, then load/save.
 
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { config } from '../config.js';
 import type { Category } from '../db/source.js';
 import { normalize } from '../text/normalize.js';
-import { DIMS, dot, embed } from './embed.js';
+import { dot, embedPassages, embedQueries } from './embed.js';
 
 export type Hit = { id: number; score: number; dense?: number; bm25?: number };
 
@@ -83,11 +84,7 @@ function makeIndex(categories: Category[], vectors: Float32Array[], taxonomyHash
   const ids = categories.map((c) => c.id);
   const byId = new Map(categories.map((c, i) => [c.id, i]));
   const searchLexical = bm25(categories.map((c) => tokenize(`${c.name} ${c.definition ?? ''}`)));
-  const groups = new Map<string, number[]>();
-  categories.forEach((c) => {
-    const b = baseName(c.name);
-    groups.set(b, [...(groups.get(b) ?? []), c.id]);
-  });
+  const groups = Map.groupBy(categories, (c) => baseName(c.name));
 
   const searchDense = (q: Float32Array, k: number): Hit[] =>
     topK(vectors.map((v) => dot(q, v)), k).map((h) => ({ id: ids[h.index]!, score: h.score, dense: h.score }));
@@ -100,12 +97,9 @@ function makeIndex(categories: Category[], vectors: Float32Array[], taxonomyHash
     taxonomyHash,
     vectors,
     category: (id: number) => categories[byId.get(id)!],
-    vector: (id: number) => vectors[byId.get(id)!]!,
-    searchDense,
-    searchBm25,
     // Dense top-2k and BM25 top-2k fused by RRF; each hit keeps its component scores.
     async searchHybrid(phrase: string, k: number): Promise<Hit[]> {
-      const [q] = await embed([`query: ${phrase}`]);
+      const [q] = await embedQueries([phrase]);
       const dense = searchDense(q!, 2 * k);
       const lexical = searchBm25(phrase, 2 * k);
       const d = new Map(dense.map((h) => [h.id, h.dense!]));
@@ -114,7 +108,7 @@ function makeIndex(categories: Category[], vectors: Float32Array[], taxonomyHash
         .slice(0, k)
         .map((h) => ({ id: h.id, score: h.score, dense: d.get(h.id), bm25: l.get(h.id) }));
     },
-    siblings: (id: number): number[] => (groups.get(baseName(categories[byId.get(id)!]!.name)) ?? []).filter((s) => s !== id),
+    siblings: (id: number): number[] => (groups.get(baseName(categories[byId.get(id)!]!.name)) ?? []).filter((s) => s.id !== id).map((s) => s.id),
   };
 }
 
@@ -127,22 +121,30 @@ function makeIndex(categories: Category[], vectors: Float32Array[], taxonomyHash
 // best is not chased: on 30 manufacturers that is one run of a coin, and every change here rebuilds
 // every vector and invalidates the committed replay evidence. The BM25 side reads the whole
 // definition, which is where an exact term deep in the text is still found.
-const categoryText = (c: Category) => `passage: ${c.name}: ${(c.definition ?? '').slice(0, 1_000)}`;
+const categoryText = (c: Category) => `${c.name}: ${(c.definition ?? '').slice(0, config.embedDefinitionChars)}`;
+
+// What the saved vectors were computed from. A change to categoryText above, to the taxonomy or to
+// the model changes this, and the index is rebuilt instead of served stale.
+const textHash = (categories: Category[]) =>
+  createHash('sha256').update([config.EMBED_MODEL, config.EMBED_REVISION, ...categories.map(categoryText)].join('\u0000')).digest('hex');
 
 export async function buildIndex(categories: Category[], taxonomyHash: string): Promise<TaxonomyIndex> {
-  const vectors = await embed(categories.map(categoryText));
+  const vectors = await embedPassages(categories.map(categoryText));
   return makeIndex(categories, vectors, taxonomyHash);
 }
 
-type Meta = { taxonomyHash: string; modelId: string; dims: number; ids: number[]; builtAt: string };
+type Meta = { taxonomyHash: string; textHash: string; modelId: string; modelRevision: string; dims: number; ids: number[]; builtAt: string };
 
-export function saveIndex(index: TaxonomyIndex, path: string) {
-  const bin = new Float32Array(index.vectors.length * DIMS);
-  index.vectors.forEach((v, i) => bin.set(v, i * DIMS));
+export function saveIndex(index: TaxonomyIndex, categories: Category[], path: string) {
+  const dims = index.vectors[0]!.length;
+  const bin = new Float32Array(index.vectors.length * dims);
+  index.vectors.forEach((v, i) => bin.set(v, i * dims));
   const meta: Meta = {
     taxonomyHash: index.taxonomyHash,
+    textHash: textHash(categories),
     modelId: config.EMBED_MODEL,
-    dims: DIMS,
+    modelRevision: config.EMBED_REVISION,
+    dims,
     ids: index.ids,
     builtAt: new Date().toISOString(),
   };
@@ -151,21 +153,20 @@ export function saveIndex(index: TaxonomyIndex, path: string) {
   writeFileSync(`${path}.json`, JSON.stringify(meta, null, 2));
 }
 
-// Rebuilds when the taxonomy hash or model id differs.
+// Rebuilds when anything the vectors were computed from differs (textHash), or the file does not
+// hold one vector per category.
 export async function loadOrBuildIndex(categories: Category[], taxonomyHash: string, path = `${config.ARTIFACTS_DIR}/taxonomy-index`): Promise<TaxonomyIndex> {
   if (existsSync(`${path}.json`) && existsSync(`${path}.bin`)) {
     const meta = JSON.parse(readFileSync(`${path}.json`, 'utf8')) as Meta;
-    const fresh = meta.taxonomyHash === taxonomyHash && meta.modelId === config.EMBED_MODEL && meta.dims === DIMS && meta.ids.length === categories.length;
+    const buf = readFileSync(`${path}.bin`);
+    const fresh = meta.taxonomyHash === taxonomyHash && meta.textHash === textHash(categories) && buf.byteLength === categories.length * meta.dims * 4;
     if (fresh) {
-      const buf = readFileSync(`${path}.bin`);
       const bin = new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
-      let row = 0;
-      const next = () => bin.slice(row * DIMS, ++row * DIMS);
-      const vectors = categories.map(next);
+      const vectors = categories.map((_, i) => bin.slice(i * meta.dims, (i + 1) * meta.dims));
       return makeIndex(categories, vectors, taxonomyHash);
     }
   }
   const index = await buildIndex(categories, taxonomyHash);
-  saveIndex(index, path);
+  saveIndex(index, categories, path);
   return index;
 }

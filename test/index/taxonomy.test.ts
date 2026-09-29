@@ -1,7 +1,8 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { config } from '../../src/config.js';
 import { openSource } from '../../src/db/source.js';
 import { modelCached } from '../../src/index/embed.js';
 import { buildIndex, loadOrBuildIndex, saveIndex, type TaxonomyIndex } from '../../src/index/taxonomy.js';
@@ -42,16 +43,27 @@ describe.skipIf(!modelCached())('taxonomy index (integration)', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'kct-idx-')), 'idx');
     const small = categories.slice(0, 3).map((c, i) => (i === 2 ? { ...c, definition: null } : c));
     const built = await buildIndex(small, 'hash-a');
-    saveIndex(built, path);
+    saveIndex(built, small, path);
     const reloaded = await loadOrBuildIndex(small, 'hash-a', path);
-    expect(reloaded.vector(small[0]!.id)).toEqual(built.vector(small[0]!.id));
+    expect(reloaded.vectors[0]).toEqual(built.vectors[0]);
     const before = JSON.parse(readFileSync(`${path}.json`, 'utf8')).builtAt;
     await loadOrBuildIndex(small, 'hash-b', path);
     expect(JSON.parse(readFileSync(`${path}.json`, 'utf8')).taxonomyHash).toBe('hash-b');
     expect(JSON.parse(readFileSync(`${path}.json`, 'utf8')).builtAt).not.toBe(before);
-    // corrupt meta model id -> rebuild
-    writeFileSync(`${path}.json`, JSON.stringify({ ...JSON.parse(readFileSync(`${path}.json`, 'utf8')), modelId: 'other' }));
+    // Vectors computed from other text (another definition cut, model or revision) -> rebuild.
+    writeFileSync(`${path}.json`, JSON.stringify({ ...JSON.parse(readFileSync(`${path}.json`, 'utf8')), textHash: 'other' }));
     await loadOrBuildIndex(small, 'hash-b', path);
-    expect(JSON.parse(readFileSync(`${path}.json`, 'utf8')).modelId).not.toBe('other');
+    expect(JSON.parse(readFileSync(`${path}.json`, 'utf8')).textHash).not.toBe('other');
+  });
+
+  // The committed index must be served as it is on a fresh clone, never silently rebuilt: its
+  // vectors are what the committed replay evidence was retrieved with.
+  it('the committed index is fresh for the committed taxonomy and settings', async () => {
+    const path = join(mkdtempSync(join(tmpdir(), 'kct-idx-')), 'idx');
+    for (const ext of ['json', 'bin']) copyFileSync(`artifacts/taxonomy-index.${ext}`, `${path}.${ext}`);
+    const before = readFileSync(`${path}.json`, 'utf8');
+    await loadOrBuildIndex(categories, src.taxonomyHash(), path);
+    expect(readFileSync(`${path}.json`, 'utf8')).toBe(before); // served, not rebuilt
+    expect(JSON.parse(before).modelRevision).toBe(config.EMBED_REVISION);
   });
 });

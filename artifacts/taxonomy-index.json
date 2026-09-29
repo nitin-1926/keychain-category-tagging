@@ -1,6 +1,8 @@
 {
   "taxonomyHash": "98c0f1aed7eb860a47b52673ab1bc24303d4fb6f5481dcc9f4b5d06a68ff70dd",
+  "textHash": "93b6c7284f7eb914f1ffc491fbd88d2c37f2dcce9bd955eba706219027246b8f",
   "modelId": "Xenova/multilingual-e5-small",
+  "modelRevision": "761b726dd34fb83930e26aab4e9ac3899aa1fa78",
   "dims": 384,
   "ids": [
     388,
