@@ -137,7 +137,7 @@ Full reasoning, diagrams and the guards / guardrails / evals table: [ARCHITECTUR
 
 Every number below is reproduced by the command named beside it; the full tables are in `artifacts/report.md` (`npm run cli -- report`, no model calls).
 
-**Reference set.** No answer key was provided, so one was built once and committed as `artifacts/reference.json`: TypeSafe's Jev answered one yes/no question per category (all 1,424) for each manufacturer with the pipeline's own card as state ($0.17), every disagreement with the pipeline was settled by `gpt-6-sol` with the full definition in view (416 verdicts, $4.15), and the five marketplaces / investors have an empty reference by Keychain's answer. Result: 391 known-correct sibling groups over 25 tagged manufacturers; the arbiter sided with the pipeline on 316 of the 416 disagreements, so Jev alone would have been a poor judge. Neither model is in the pipeline and neither is needed to run the eval.
+**Reference set.** No answer key was provided, so one was built once and committed as `artifacts/reference.json`: TypeSafe's Jev answered one yes/no question per category (all 1,424) for each manufacturer with the pipeline's own card as state ($0.17), every disagreement with the pipeline was settled by `gpt-6-sol` with the full definition in view (416 verdicts, $4.15), and the five marketplaces and investors have an empty reference (three confirmed by Keychain, two the pipeline's own call; see the limits below). Result: 391 known-correct sibling groups over 25 tagged manufacturers; the arbiter sided with the pipeline on 316 of the 416 disagreements, so Jev alone would have been a poor judge. Neither model is in the pipeline and neither is needed to run the eval.
 
 **Accuracy** (per sibling group, all 30 manufacturers, `gpt-6-luna`, judge prompt v2):
 
@@ -146,6 +146,13 @@ Every number below is reproduced by the command named beside it; the full tables
 | 307 | 16 | 84 | 95.0% | 78.5% | 86.0% |
 
 Where the 84 misses come from: 60 the judge rejected although the category applies (it reads definitions narrowly: "confectionery coating" was not recognised as `Chocolate / Candy Melts`, "distilled water" not as `Purified Water`), 18 that were on the card but never reached the judge (`not_in_shortlist`, the retrieval side), 4 the card itself missed, 2 flipped by the quote guard. The 16 wrong tags are listed by manufacturer in the report.
+
+**Limits of this score.** Read the numbers above with these in mind:
+
+- The reference is two models' judgment, not a person's: one Jev run corrected by one `gpt-6-sol` pass. Where the pipeline, Jev and the arbiter all agree, nobody checked. A human pass over 20 arbiter verdicts was planned (AI_LOG.md, grill Q1b) and not done in the time.
+- Jev read the pipeline's card, not the raw site, so a product no card extracted cannot be in the reference. Recall here measures retrieval and the judge, not extraction; extraction is measured separately (two full reads of one site disagree on 9.8% of products, below).
+- The five marketplaces and investors score as correct by construction, so a wrong entity gate would be invisible. Keychain confirmed three; the other two are the pipeline's own call: whitelabelpartners.com's pages are reviews of white-label providers, and exportsfromeurope.com showcases European exporters to buyers.
+- Some of the 16 "wrong" tags are right on the page: refresco.com's Purified Water ("purified still and sparkling waters"), Nectar Juice ("nectars") and Vegetable Juice ("all varieties of vegetable juices") are quoted from its site, and the reference rejects them. The reference can err the other way too; every tag carries its quote, so a reviewer can settle each one in seconds.
 
 **Three tested changes that were rejected, and what they cost to find out.** Each one bought recall and paid for it in precision — the pipeline is sitting on its precision/recall frontier.
 
@@ -218,9 +225,9 @@ The measurements above say where the remaining headroom is and, just as usefully
 | `ARCHITECTURE.md` | dataset facts, design, diagrams, guards and evals |
 | `docs/plans/` | the approved implementation plan (14 units) |
 | `docs/RESEARCH.md`, `docs/probes/` | company and prior-art notes; the two design probes with their unedited output |
-| `AI_LOG.md` | AI usage log (deliverable 7): every prompt verbatim, decisions, catches |
+| `AI_LOG.md` | AI usage log (deliverable 6): the significant prompts, what was verified, what was rejected or changed, and the catches (indexed at the top) |
 | `src/` | `text/` cleaning and chunking, `index/` embeddings and retrieval, `pipeline/` profile / shortlist / judge / policy / tag, `llm/` client, pricing and replay, `db/` the read-only source and the artifacts store, `api/` Fastify, `eval/` comparison against the reference set and the report, `pool.ts` the one worker pool (profile windows, jobs, `tag-all`) |
 | `test/` | 16 files, 96 tests, mirroring `src/`; `test/fake-llm.ts` fakes the model the way a provider plugs in (a `Transport`), so tests run the real parse, retry, cache and cost path. The ones that need the local embedding model skip themselves |
 | `src/prompts/` | versioned prompt files; the version is part of every cache key |
-| `artifacts/` | taxonomy index, replay files, dev set, reference set, the budget / query-mode / retrieval studies, report, spot check, calibration (`tagging.sqlite` is gitignored) |
+| `artifacts/` | taxonomy index, replay files, dev set, reference set, the budget / query-mode / retrieval studies, report, calibration (`tagging.sqlite` is gitignored) |
 | `data/` | the provided SQLite, opened read-only |

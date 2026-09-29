@@ -315,7 +315,7 @@ flowchart LR
 
 Why an independent model over all 1,424 and not our own shortlist: a reference that shares the pipeline's retrieval inherits its misses, and the point was to measure those (`not_in_shortlist`, `not_on_card`). Why an arbiter: Jev proved generous (56 positives for refresco.com against 15 returned); of the 416 disagreements the arbiter sided with the pipeline 316 times and with Jev 100 times, so scoring against raw Jev would have punished correct rejections. Neither Jev nor the arbiter is part of the pipeline; the TypeSafe SDK is not in the repo any more; `npm run cli -- report` reads the stored results and the reference file and makes no model calls.
 
-What the report leaves behind: `artifacts/report.md` (accuracy, misses by cause and by manufacturer, calibration, cost), `artifacts/calibration.json`, and the earlier `artifacts/spot-check.md` (20 arbiter verdicts for the owner's eye). Known limits, stated in the README: the reference is only as good as one Jev run corrected by one sol pass; where the pipeline, Jev and the arbiter all agree, nobody checked; and the five `not_a_manufacturer` answers are agreed by construction (Keychain's answer 2), so a wrong entity gate is invisible to it. `artifacts/query-mode-study.json` reuses the reference to compare the three retrieval query modes at zero model cost.
+What the report leaves behind: `artifacts/report.md` (accuracy, misses by cause and by manufacturer, calibration, cost), and `artifacts/calibration.json`. Known limits, listed in the README under "Limits of this score": the reference is only as good as one Jev run corrected by one sol pass; where the pipeline, Jev and the arbiter all agree, nobody checked; Jev read the pipeline's card, so a product no card extracted is invisible to it; and the five `not_a_manufacturer` answers are agreed by construction (Keychain confirmed three of them, answer 2), so a wrong entity gate is invisible to it. `artifacts/query-mode-study.json` reuses the reference to compare the three retrieval query modes at zero model cost.
 
 ## 9. Where the model is trusted and where it is not
 
@@ -328,7 +328,7 @@ What the report leaves behind: `artifacts/report.md` (accuracy, misses by cause 
 | Whether a category applies | LLM (judge) | needs the definition and the evidence side by side |
 | Whether the id is real, whether the quote is real | code | structural guarantees, no trust needed |
 | Storage variant when unstated | code (policy) | the model guesses badly here; the rule is explainable |
-| Whether the pipeline was right | Jev + arbiter + owner spot-check | independent second opinion, human on the mismatches |
+| Whether the pipeline was right | Jev + arbiter | independent second opinion; the planned human pass on the arbiter was not done (README, limits of this score) |
 
 ### 9.1 Guards, guardrails and evals
 
@@ -369,7 +369,6 @@ Three layers keep the model from making basic mistakes. Guards are code that run
 | Query-mode study | does name + quote or a conditional query shortlist more of the reference? | `artifacts/query-mode-study.json`: no (22 / 22 / 25 of 391 missed) |
 | Retrieval study | can the 18 groups the judge never sees be bought back, and does buying them pay? | `artifacts/retrieval-study.json`: yes and no - the cap buys them (22 misses down to 3), and live it trades 5 points of precision for 3 of recall at 56% more cost |
 | No-key replay of a fresh copy | does the whole run reproduce without a key, byte for byte on cost? | the fresh-copy check, identical total |
-| Owner spot-check | is the arbiter itself right? | `artifacts/spot-check.md`, 20 verdicts with an Owner column |
 | Cost table | what does each manufacturer cost, and each call type, and the whole base? | measured tokens and dollars, x30,000 projection |
 
 ## 10. Not built, on purpose
@@ -391,4 +390,4 @@ Three checks were run on the first draft: a web research pass on better alternat
 | Quote check normalises typography and markdown, with a fuzzy tier | Byte-exact checks reject faithful quotes; a known failure mode, worse on German / French text |
 | Mismatches diffed per sibling group; arbiter dry run | A product with unknown storage would otherwise create three mismatches and the arbiter bill would run away |
 
-Rejected after the review: a cross-encoder reranker (latency for marginal gain; the judge already discriminates on the shortlist), HyDE-style query generation for selection (an extra LLM call that embedding the definitions already covers), larger embedding models (5x the size, some without ONNX weights; e5-small proved adequate in the probes), and a human-labelled gold set (research treats one as near-mandatory; the owner chose Jev + arbiter + spot-check in grill Q1, and the spot-check list is built so it can grow to 50 items).
+Rejected after the review: a cross-encoder reranker (latency for marginal gain; the judge already discriminates on the shortlist), HyDE-style query generation for selection (an extra LLM call that embedding the definitions already covers), larger embedding models (5x the size, some without ONNX weights; e5-small proved adequate in the probes), and a human-labelled gold set (research treats one as near-mandatory; the owner chose Jev + arbiter + a human spot check in grill Q1; the spot check was not done in the time).
