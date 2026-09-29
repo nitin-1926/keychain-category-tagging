@@ -561,10 +561,10 @@ After the single-process `tag-all --force`: 30 results, $1.0077 total; `cache ex
 
 **Decisions (fixed, with the evidence that made each one certain):**
 - **Replay could bill you.** Fixed as above (`src/llm/client.ts`).
-- **`cache export` could destroy the committed evidence.** `exportReplay` deleted the target directory before it knew whether any row survived the filter, so on a fresh clone (where `tagging.sqlite` is gitignored and the cache is empty) it emptied `artifacts/replay/` and printed `(cache empty)`. Reproduced on a copy: 30 files in, 0 out. It now groups the rows first, refuses with an error if none match, and deletes only the `.json` files it is about to rewrite — which also stops `cache export src` from recursively deleting a source directory.
+- **`cache export` could destroy the committed evidence.** `exportReplay` deleted the target directory before it knew whether any row survived the filter, so on a fresh clone (where `tagging.sqlite` is gitignored and the cache is empty) it emptied `artifacts/replay/` and printed `(cache empty)`. Reproduced on a copy: 30 files in, 0 out. It now groups the rows first, refuses with an error if none match, and deletes only the `.json` files it is about to rewrite — which also stops `cache export src` from recursively deleting a source directory. *(Correction, entry 18: it did not — it deleted every `.json` in the target directory. Fixed in entry 19.)*
 - **`report` on a fresh clone printed 100% / 100% / 100% over zero manufacturers and overwrote the committed `artifacts/report.md` with it.** `cli report` now exits 1 with the command to run first.
 - **The fuzzy quote guard could be paid off with repetition.** `findQuote` counted the quote's tokens with repeats against a set of evidence tokens, so `"we make we make we make pasta"` matched a site that never says pasta. It now counts distinct tokens. Measured over all 30 stored cards before applying it: 1,235 card quotes and 327 judge quotes, **zero** verdicts change, so the hole closes without touching a single cached answer.
-- **A stored `error` was served forever.** `tag()` returned any row it found, including a failed attempt, so one transient failure permanently untagged a manufacturer until someone passed `--force`. Errors are still stored (for diagnosis) but never served, and `LlmOutputError` now carries both raw outputs into the stored message, which is what ARCHITECTURE section 9 had been promising.
+- **A stored `error` was served forever.** `tag()` returned any row it found, including a failed attempt, so one transient failure permanently untagged a manufacturer until someone passed `--force`. Errors are still stored (for diagnosis) but never served *(by `tag()`; the API's GET still served them under a 200 — entry 18, fixed in entry 19)*, and `LlmOutputError` now carries both raw outputs into the stored message, which is what ARCHITECTURE section 9 had been promising.
 - **The bill could vanish.** `result.costUsd` was assigned only after the judge returned, so a judge failure discarded every window call already paid for. Cost is now accumulated as it is spent.
 - **The result key was missing three inputs that change the answer**: the manufacturer id (two manufacturers with the same site text shared one row, and the second then 404ed on `GET /categories` — the dataset already lists Johnvince Foods twice), `CUTOFF` and `NON_MANUFACTURER_POLICY`. All three are in the key now, and `report` reads only rows written by the current version set rather than the newest row of any version.
 - **The job runner could take the process down.** A throw outside the per-item guard became an unhandled rejection, killing the server and silently dropping every queued job; the trigger is the `SQLITE_BUSY` the README already warns about. The loop now marks that job failed and drains the rest.
@@ -639,3 +639,73 @@ Two of the seven (god-review and ce-code-review) were stopped before they finish
 - Ponytail found about 60–70 lines to cut out of about 3,250, and no dependency worth dropping.
 
 **Outcome:** reported to the owner with a proposed fix list. Nothing was changed except this entry. Nothing committed.
+
+### 19. Fix everything the second review found  (2026-09-29, Claude Code)
+
+**Prompt** (verbatim):
+> Yes please implement and fix everything. Don't stop untill done.
+
+**Response summary:** every confirmed finding from entry 18 was fixed. That covers the six bugs, the smaller correctness and security items, the ponytail deletions and all seven architecture candidates. Five items stayed rejected, for the reasons given in the report:
+- `node:sqlite`: still experimental.
+- dropping `tsx`: blocked.
+- the dev-set sampling code: it shows how the 30 were drawn.
+- inlining `registerRoutes`: gains nothing.
+- the `gpt-6-sol` price row: it is what a "try the bigger model" extension needs.
+
+One rule governed the work: **no model request may change**, so the committed replay evidence stays valid and nothing needs a live run.
+
+**Correctness:**
+- **`cache export`** now deletes only files named like replay files (`^(\d+|untagged)\.json$`). A test puts `package.json` and `reference.json` in the target directory and checks they survive.
+- **The result key** is now built by leaving settings out, not by listing them in. It is every setting in `config.ts` except the key, the mode, paths and concurrency, plus a hash of the three prompt files' text. The stray constants (`MIN_CLEANED_CHARS`, the judge's 2,000-char head and 300-char definitions, the 1,000-char embedding cut) moved into `config.ts` so they count. A test changes `judgeBatchSize`, `windowChars`, `minCleanedChars` and `CUTOFF` one at a time and requires the key to move each time.
+- **Failed runs** are stored under their own key, `<key>:error`. A forced re-run that fails can no longer overwrite the stored answer. `results.current()` is now the one "current answer" read (current versions only, an answer before a failure). The API's GET and `report` both use it, so GET returns 502 for a failure, as POST does, and 404 for another version's answer.
+- **Spend:**
+  - `tag()` hands profile and judge a client that charges every billed attempt as it returns.
+  - The client reports both attempts of a call that fails its schema.
+  - The worker pool now waits for in-flight windows before it rethrows, so nothing keeps billing after the row is stored.
+  - An unpriced model fails before the network call.
+  - `profile()` and `judge()` no longer add up usage.
+- **Cache:** a cached row that no longer parses is replaced by the fresh answer, instead of being paid for on every run.
+- **Jobs endpoint:** ids are deduplicated and checked against the dataset before anything is queued (unknown ids get a 400), and the loop yields after every item.
+- **`tag-all`** isolates each manufacturer, so one failure no longer ends the run.
+
+**Policy and guards**, each measured before it went in:
+- **Storage words** match as whole words in any script. JavaScript's `\b` is ASCII-only, so "surgelé", "congelé" and "réfrigéré" had never counted.
+- **"Fresh" on the card:** a card product whose own quote says "fresh" and names no storage word is no longer storage evidence. The measurement found 2 such products, and neither changed a tag.
+- **Punctuation-only quotes** are `none`.
+- **One-word quotes stay valid.** A minimum-length rule was measured first: 68 of the 327 judge quotes are single product words ("Bagels", "Vodka") and 63 of those are right, so the rule would have cut recall hard for a threat no site in the set shows. ARCHITECTURE's claim that the entity type is "guarded by the quote check" was false and is corrected. The prompt-injection limit is written up under "With more time".
+- The "fresh" fix and the injection framing both have prompt-side versions. Those need a v3 prompt and a live re-run, so they were not bought.
+
+**Security:**
+- The API refuses a request whose Host is not localhost, or whose browser Origin is another site's (403).
+- The shortlist has a hard ceiling of 600 candidates (20 batches). It never binds on the 30; the largest shortlist is 527.
+- **The embedding model is pinned to upstream commit `761b726d`.** First, the four local model files were compared with that commit's hashes, and all matched. Then all 1,424 categories were re-embedded through the shipped `buildIndex`: every vector was byte-identical to the committed index, largest difference 0.
+
+**Architecture:**
+- The index is rebuilt whenever the text it embedded changes. It stores a hash of that text, which covers the definition cut, the model and the revision. That hash was added to the committed `taxonomy-index.json` without touching the `.bin`, after the re-embedding proof above.
+- `embed.ts` now owns the e5 prefixes and the vector size.
+- Stub mode is deleted. Tests fake the model as a `Transport` (`test/fake-llm.ts`), so they go through the real parse, retry, cache and cost path. The "force doubles the calls" assertion now says what production does: not stored, zero new calls.
+- A compiler-checked map ties each policy reject reason to its eval cause.
+- There is now one worker pool (`src/pool.ts`), used by profile, jobs and `tag-all`.
+
+**Ponytail cuts:**
+- `Map.groupBy` replaces five hand-written group-bys (tsconfig target moved to ES2024). The replay export keeps its streaming loop, because the whole cache is about 90 MB.
+- Deleted: `cache.count`, `Chunk.heading`, the unused `Config` / `ApiResult` / `LlmResult.key` / `.raw` fields, index methods with no outside caller, parameters no caller passes, and `export` on 13 symbols nothing imports.
+- The quote guard now normalises the site once per evidence text, not once per quote. On the largest site (968K chars, 53 quotes) it went from 2,124 ms to 47 ms, with identical answers.
+
+**CATCH (my own test was toothless):** every fix was checked the owner's way: undo the fix, confirm its test fails, put it back. Across the 16 fixes, one test survived its mutation. The French-word test passed with the fix undone, because a lone Frozen category is kept by the "only qualified siblings exist" branch either way. It now asserts the storage was *evidenced*. The tightened test then failed on "tiefgekühlte Knödel", a real gap: German "tiefgekühlt" (deep-frozen) was not in the frozen list, only "tiefkühl…". It is now.
+
+**CATCH (the migration would have rebuilt the committed index):** the first test run after the freshness change timed out, because the committed index had no text hash and so looked stale. Left alone, a fresh clone would have re-embedded all 1,424 categories on its first command. It also would have overwritten the committed vectors, which the replay evidence was retrieved with. The hash was added only after the byte-identical proof, and a test now copies the committed index and checks that it is served as it is.
+
+**Verification:**
+- `npm run typecheck`: clean. `npm test`: **96 passing in 16 files** (was 80 in 15).
+- All 16 fixes were checked by undoing each one: every test failed without its fix, once the French test had been tightened.
+- A replay `tag-all` over new result keys re-ran all 30 through the pipeline from the cache: **no replay miss, $0.5105**. Every manufacturer's status, accepted ids, rejection count, cost and evidence stats are identical to the baseline taken before the first edit.
+- `report`: **P 95.0% R 78.5% F1 86.0%**; the report body and calibration are identical apart from their timestamps.
+- `cache export` is byte-identical to the committed `artifacts/replay`.
+- An API smoke test against the real store gave 200 current, 404 unknown, 400 for an unknown id in a job, a job of `[902, 902, 507]` counted as 2, and 403 for a foreign origin.
+- A fresh copy built from the git-trackable files only (no `.env`, no store, no model cache) downloaded the model at the pinned commit and reproduced all 30 at $0.5105 and the same P / R / F1. The committed index was served, not rebuilt.
+- Every documented CLI command ran once in replay and exited 0: `ids`, `clean-stats`, `index`, `profile`, `shortlist` (both modes), `search`, `tag`, `cache import`, `report`.
+
+**Said plainly, because it bounds the result-key fix:** the key covers settings and prompt text, not code. After editing pipeline code (a policy rule, say), re-tag with `--force` (`?force=true` on the API). It is free unless a prompt changed, because every model call comes from the cache. The comment in `tag.ts`, the README and ARCHITECTURE now all say this rather than "everything that can change the answer".
+
+**Spend:** $0. Nothing committed.
