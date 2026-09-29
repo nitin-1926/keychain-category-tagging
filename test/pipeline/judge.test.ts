@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { openStore } from '../../src/db/store.js';
-import { createClient } from '../../src/llm/client.js';
 import { batches, evidenceBlocks, judge, JUDGE_PROMPT, type JudgeOutput } from '../../src/pipeline/judge.js';
 import type { Card } from '../../src/pipeline/profile.js';
 import type { Candidate } from '../../src/pipeline/shortlist.js';
 import { chunk } from '../../src/text/chunk.js';
 import type { z } from 'zod';
+import { candidateIds, fakeLlm } from '../fake-llm.js';
 
 const cand = (id: number, name: string, group = name.toLowerCase()): Candidate => ({
   id, name, definition: `${name} definition`, score: 1 / id, phrases: ['x'], matchedBy: 'both', group,
@@ -46,15 +45,8 @@ describe('evidenceBlocks', () => {
   });
 });
 
-describe('judge (stub)', () => {
-  const stubbed = (fn: (ids: number[]) => z.infer<typeof JudgeOutput>['verdicts']) => {
-    const llm = createClient({ mode: 'stub', store: openStore(':memory:') });
-    llm.stub.on<z.infer<typeof JudgeOutput>>('judge', (req) => {
-      const ids = (JSON.parse(req.user.split('CANDIDATES\n')[1]!) as { id: number }[]).map((c) => c.id);
-      return { verdicts: fn(ids) };
-    });
-    return llm;
-  };
+describe('judge (fake model)', () => {
+  const withJudge = (fn: (ids: number[]) => z.infer<typeof JudgeOutput>['verdicts']) => fakeLlm({ judge: (req) => ({ verdicts: fn(candidateIds(req.user)) }) }).llm;
 
   it('prompt states the two rules', () => {
     expect(JUDGE_PROMPT).toMatch(/capability sentence alone/);
@@ -62,7 +54,7 @@ describe('judge (stub)', () => {
   });
 
   it('drops ids outside the batch, flips applies when the quote is not in the evidence, fills missing ids', async () => {
-    const llm = stubbed((ids) => [
+    const llm = withJudge((ids) => [
       { id: ids[0]!, applies: true, confidence: 0.9, quote: 'cold brew coffee in cans', reason: 'named' },
       { id: ids[1]!, applies: true, confidence: 0.8, quote: 'we make frozen pizza', reason: 'invented' },
       { id: 999, applies: true, confidence: 1, quote: 'x', reason: 'not in batch' },
@@ -79,7 +71,7 @@ describe('judge (stub)', () => {
   });
 
   it('merges verdicts across batches', async () => {
-    const llm = stubbed((ids) => ids.map((id) => ({ id, applies: id % 2 === 0, confidence: 0.7, quote: id % 2 === 0 ? 'kombucha' : null, reason: 'no' })));
+    const llm = withJudge((ids) => ids.map((id) => ({ id, applies: id % 2 === 0, confidence: 0.7, quote: id % 2 === 0 ? 'kombucha' : null, reason: 'no' })));
     const cs = Array.from({ length: 65 }, (_, i) => cand(i + 1, `C${i + 1}`));
     const r = await judge(llm, card, evidence, cs, 't');
     expect(r.batches).toBe(3);

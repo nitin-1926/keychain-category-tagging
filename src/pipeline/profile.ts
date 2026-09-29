@@ -2,18 +2,20 @@
 // verify every quote. The card is what the rest of the pipeline works from - the site text is not
 // looked at again except as evidence for the judge.
 // Called by: pipeline/tag.ts (and the cli `profile` command, to print a card on its own).
-// Calls: llm/client.ts complete() once per window plus one merge call; text/normalize.ts for the
-// quote guard. Next step: pipeline/shortlist.ts, on the card this returns.
-// Order below: the Card schema (what the model must return), windows(), pool(), verifyCard() (the
-// guard), then profile() which runs the three in sequence.
+// Calls: llm/client.ts complete() once per window plus one merge call (windows run through
+// pool.ts, four at a time); text/normalize.ts for the quote guard. What the calls cost is recorded
+// by the client that pipeline/tag.ts hands in, not here. Next step: pipeline/shortlist.ts, on the
+// card this returns.
+// Order below: the Card schema (what the model must return), windows(), verifyCard() (the guard),
+// then profile() which runs them in sequence.
 
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { config } from '../config.js';
 import type { LlmClient } from '../llm/client.js';
-import { addUsage, ZERO_USAGE, type Usage } from '../llm/pricing.js';
+import { pool } from '../pool.js';
 import type { Chunk } from '../text/chunk.js';
-import { findQuote, normalize, type QuoteMatch } from '../text/normalize.js';
+import { normalize, quoteMatcher, type QuoteMatch } from '../text/normalize.js';
 
 const ENTITY_TYPES = ['manufacturer', 'co_packer', 'both', 'marketplace', 'investor', 'distributor', 'other'] as const;
 const STORAGE = ['frozen', 'refrigerated', 'shelf_stable'] as const;
@@ -32,13 +34,10 @@ const prompt = (name: string) => readFileSync(new URL(`../prompts/${name}.md`, i
 export const PROFILE_PROMPT = prompt(`profile.${config.prompts.profile}`);
 export const REDUCE_PROMPT = prompt(`profile-reduce.${config.prompts.profileReduce}`);
 
-export type ProfileResult = {
+type ProfileResult = {
   card: Card;
   windows: number;
   quotes: Record<QuoteMatch, number>; // exact / fuzzy kept, none dropped
-  usage: Usage;
-  costUsd: number;
-  evidence: string; // what the model saw, for the judge and for replay
 };
 
 // Consecutive chunks grouped into windows of about windowChars (~10K tokens at 4 chars/token).
@@ -59,22 +58,13 @@ export function windows(chunks: Chunk[], windowChars = config.windowChars): stri
   return out;
 }
 
-async function pool<T, R>(items: T[], n: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  const worker = async () => {
-    for (let i = next++; i < items.length; i = next++) out[i] = await fn(items[i]!, i);
-  };
-  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
-  return out;
-}
-
 // Code-side guard after the model: quotes must be in the evidence; products deduped by normalised name.
 export function verifyCard(card: Card, evidence: string): { card: Card; quotes: Record<QuoteMatch, number> } {
   const quotes: Record<QuoteMatch, number> = { exact: 0, fuzzy: 0, none: 0 };
+  const findQuote = quoteMatcher(evidence);
   const seen = new Set<string>();
   const products = card.products.filter((p) => {
-    const m = findQuote(p.quote, evidence);
+    const m = findQuote(p.quote);
     quotes[m]++;
     if (m === 'none') return false;
     const k = normalize(p.name);
@@ -83,7 +73,7 @@ export function verifyCard(card: Card, evidence: string): { card: Card; quotes: 
     return true;
   });
   const capabilities = card.capabilities.filter((c) => {
-    const m = findQuote(c.quote, evidence);
+    const m = findQuote(c.quote);
     quotes[m]++;
     return m !== 'none';
   });
@@ -92,9 +82,6 @@ export function verifyCard(card: Card, evidence: string): { card: Card; quotes: 
 
 export async function profile(llm: LlmClient, chunks: Chunk[], tag: string, opts: { windowChars?: number } = {}): Promise<ProfileResult> {
   const wins = windows(chunks, opts.windowChars);
-  const evidence = wins.join('\n');
-  let usage = ZERO_USAGE;
-  let costUsd = 0;
 
   const readings = await pool(wins, config.llmConcurrency, async (text, i) => {
     const r = await llm.complete({
@@ -107,8 +94,6 @@ export async function profile(llm: LlmClient, chunks: Chunk[], tag: string, opts
       schema: Card,
       tag,
     });
-    usage = addUsage(usage, r.usage);
-    costUsd += r.costUsd;
     return r.output;
   });
 
@@ -124,10 +109,8 @@ export async function profile(llm: LlmClient, chunks: Chunk[], tag: string, opts
       schema: Card,
       tag,
     });
-    usage = addUsage(usage, r.usage);
-    costUsd += r.costUsd;
     merged = r.output;
   }
-  const { card, quotes } = verifyCard(merged, evidence);
-  return { card, windows: wins.length, quotes, usage, costUsd, evidence };
+  const { card, quotes } = verifyCard(merged, wins.join('\n'));
+  return { card, windows: wins.length, quotes };
 }

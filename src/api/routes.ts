@@ -5,7 +5,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { fromRow, tag, type Deps } from '../pipeline/tag.js';
+import { fromRow, tag, versions, type Deps } from '../pipeline/tag.js';
 import type { Runner } from './jobs.js';
 import { toApi } from './serialize.js';
 
@@ -21,7 +21,12 @@ export function registerRoutes(app: FastifyInstance, deps: Deps, runner: Runner)
   app.post('/v1/tagging-jobs', async (req, reply) => {
     const body = JobBody.safeParse(req.body ?? {});
     if (!body.success) return reply.code(400).send({ error: 'bad_request', details: body.error.issues });
-    const ids = body.data.all ? deps.src.listManufacturerIds() : body.data.manufacturer_ids!;
+    // Deduplicated and checked against the dataset before anything is queued, so a job can never be
+    // larger than the dataset: an unbounded list of made-up ids would otherwise hold the queue.
+    const known = new Set(deps.src.listManufacturerIds());
+    const ids = body.data.all ? [...known] : [...new Set(body.data.manufacturer_ids)];
+    const unknown = ids.filter((id) => !known.has(id));
+    if (unknown.length) return reply.code(400).send({ error: 'unknown_manufacturer', manufacturer_ids: unknown.slice(0, 20) });
     const job_id = runner.enqueue(ids, body.data.force ?? false);
     return reply.code(202).send({ job_id, manufacturers: ids.length });
   });
@@ -37,12 +42,14 @@ export function registerRoutes(app: FastifyInstance, deps: Deps, runner: Runner)
     return { job_id: job.id, status: job.status, counts, cost_usd, manufacturers: job.items, created_at: job.created_at, updated_at: job.updated_at };
   });
 
+  // The current pipeline's answer, or 404: a row written under other prompts or settings is not
+  // served as today's. A failed last attempt with no answer behind it is a 502, as on POST.
   app.get('/v1/manufacturers/:id/categories', async (req, reply) => {
     const p = IdParam.safeParse(req.params);
     if (!p.success) return reply.code(400).send({ error: 'bad_request' });
-    const row = deps.store.results.latest(p.data.id);
+    const row = deps.store.results.current(p.data.id, JSON.stringify(versions(deps.index.taxonomyHash)));
     if (!row) return reply.code(404).send({ error: 'not_tagged' });
-    return toApi(fromRow(row));
+    return reply.code(row.status === 'error' ? 502 : 200).send(toApi(fromRow(row)));
   });
 
   app.post('/v1/manufacturers/:id/tag', async (req, reply) => {

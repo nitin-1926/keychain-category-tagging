@@ -8,27 +8,28 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { config } from '../config.js';
+import { addUsage, ZERO_USAGE } from '../llm/pricing.js';
 import { fromRow, versions, type Deps, type TagResult } from '../pipeline/tag.js';
 import { diff, metrics, pipelineGroups, score, type Group, type Metrics, type Mismatch } from './compare.js';
 
-export type Reference = {
+type Reference = {
   generatedAt: string;
   method: string;
   cost?: { jevUsd: number; arbiterUsd: number };
   manufacturers: Record<string, { domain: string; status: string; groups: { key: string; ids: number[]; names: string[]; source: string; reason?: string }[]; excluded: { key: string; names: string[]; reason?: string }[] }>;
 };
 
-export const loadReference = (path = `${config.ARTIFACTS_DIR}/reference.json`): Reference => JSON.parse(readFileSync(path, 'utf8'));
+export const loadReference = (): Reference => JSON.parse(readFileSync(`${config.ARTIFACTS_DIR}/reference.json`, 'utf8'));
 
 export type Compared = { id: number; domain: string; result: TagResult; mismatches: Mismatch[]; scores: Metrics };
 
-// Only rows produced by the current pipeline are scored: a report headed "prompts judge v2" must
-// not be computed from a row some other prompt version wrote.
-export async function compareAll(deps: Deps, reference = loadReference(), ids = deps.src.listManufacturerIds()): Promise<Compared[]> {
+// Only rows produced by the current pipeline are scored (results.current(), the same read the API
+// serves): a report headed "prompts judge v2" must not be computed from a row another version wrote.
+export async function compareAll(deps: Deps, reference: Reference): Promise<Compared[]> {
   const current = JSON.stringify(versions(deps.index.taxonomyHash));
   const out: Compared[] = [];
-  for (const id of ids) {
-    const row = deps.store.results.latest(id, current);
+  for (const id of deps.src.listManufacturerIds()) {
+    const row = deps.store.results.current(id, current);
     const ref = reference.manufacturers[String(id)];
     if (!row || !ref) continue;
     const result = fromRow(row);
@@ -83,12 +84,10 @@ export function calibration(rows: Compared[]) {
   return { verdicts: vs.length, referenceGroups, bins, cutoffs, chosenCutoff: chosen.cutoff };
 }
 
-export function costTable(rows: Compared[], reference: Reference) {
+function costTable(rows: Compared[], reference: Reference) {
   const costs = rows.map((r) => r.result.costUsd);
   const total = costs.reduce((a, b) => a + b, 0);
-  const inTok = rows.reduce((n, r) => n + r.result.usage.total.input, 0);
-  const cached = rows.reduce((n, r) => n + r.result.usage.total.cached, 0);
-  const outTok = rows.reduce((n, r) => n + r.result.usage.total.output, 0);
+  const { input: inTok, cached, output: outTok } = rows.reduce((t, r) => addUsage(t, r.result.usage.total), ZERO_USAGE);
   const profileTok = rows.reduce((n, r) => n + r.result.usage.profile.input, 0);
   const judgeTok = rows.reduce((n, r) => n + r.result.usage.judge.input, 0);
   const mean = rows.length ? total / rows.length : 0;
@@ -148,7 +147,7 @@ export function buildReport(rows: Compared[], reference: Reference) {
   lines.push(`| Input tokens (cached share) | ${cost.inputTokens.toLocaleString('en-US')} (${pct(cost.cacheHitShare)}) |`, `| Output tokens | ${cost.outputTokens.toLocaleString('en-US')} |`, `| Profile / judge share of input | ${pct(cost.profileShareOfInput)} / ${pct(cost.judgeShareOfInput)} |`);
   lines.push(`| Projected for 30,000 manufacturers | ${usd(cost.projected30k)} (Batch API: ${usd(cost.projected30kBatchApi)}) |`, `| One-off cost of building the reference set | ${usd(cost.referenceBuildUsd)} |`, ``);
 
-  return { report: lines.join('\n') + '\n', calibration: { generatedAt: new Date().toISOString(), ...cal }, overall, causes, cost };
+  return { report: lines.join('\n') + '\n', calibration: { generatedAt: new Date().toISOString(), ...cal }, overall, cost };
 }
 
 export function writeReport(out: ReturnType<typeof buildReport>) {

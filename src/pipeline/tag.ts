@@ -14,9 +14,9 @@ import type { LlmClient } from '../llm/client.js';
 import { addUsage, ZERO_USAGE, type Usage } from '../llm/pricing.js';
 import { chunk } from '../text/chunk.js';
 import { clean } from '../text/clean.js';
-import { evidenceBlocks, judge } from './judge.js';
+import { evidenceBlocks, judge, JUDGE_PROMPT } from './judge.js';
 import { applyPolicy, type Decision, type Status } from './policy.js';
-import { profile, type Card } from './profile.js';
+import { profile, PROFILE_PROMPT, REDUCE_PROMPT, type Card } from './profile.js';
 import { shortlist } from './shortlist.js';
 
 export type Deps = { src: SourceDb; store: Store; llm: LlmClient; index: TaxonomyIndex };
@@ -38,30 +38,24 @@ export type TagResult = {
   error: string | null;
 };
 
-export const MIN_CLEANED_CHARS = 2_000;
+// Every setting and prompt that can change the answer, so that changing any of them re-tags instead
+// of serving a stored row. Built by leaving settings out, not by listing them in: a hand-kept list
+// missed seven settings across two audits (AI_LOG entries 16 and 18). What is left out changes how
+// a run happens, not what it returns - the key, the mode, file paths, concurrency. The prompts count
+// by their text as well as their label, so editing a prompt file in place is a change too.
+// Code is not in the key: after editing pipeline code (a policy rule, say), re-tag with --force /
+// ?force=true. The model calls still come from the cache, so that costs nothing unless a prompt changed.
+const promptText = createHash('sha256').update([PROFILE_PROMPT, REDUCE_PROMPT, JUDGE_PROMPT].join('\u0000')).digest('hex').slice(0, 16);
 
-// Everything that can change the answer. A value missing here would serve a stale row after a
-// change to it: cutoff and the entity-gate policy are env-settable and decide what is returned.
 export function versions(taxonomyHash: string): Record<string, string> {
-  return {
-    profile: config.prompts.profile,
-    profileReduce: config.prompts.profileReduce,
-    judge: config.prompts.judge,
-    modelPipeline: config.MODEL_PIPELINE,
-    embedModel: config.EMBED_MODEL,
-    queryMode: config.QUERY_MODE,
-    retrievalK: String(config.retrievalK),
-    shortlistCap: String(config.shortlistCap),
-    cutoff: String(config.CUTOFF),
-    nonManufacturerPolicy: config.NON_MANUFACTURER_POLICY,
-    taxonomyHash,
-  };
+  const { OPENAI_API_KEY, LLM_MODE, SOURCE_DB, ARTIFACTS_DIR, llmConcurrency, prompts, ...settings } = config;
+  return { ...prompts, promptText, ...Object.fromEntries(Object.entries(settings).map(([k, v]) => [k, String(v)])), taxonomyHash };
 }
 
 // The manufacturer id is part of the key: two manufacturers can hold the same site text (the
 // dataset already lists Johnvince Foods twice), and a shared row would file one company's
 // answer under the other's id.
-export function resultKey(manufacturerId: number, cleanedText: string, v: Record<string, string>): string {
+function resultKey(manufacturerId: number, cleanedText: string, v: Record<string, string>): string {
   return createHash('sha256').update(String(manufacturerId)).update('\u0000').update(cleanedText).update('\u0000').update(JSON.stringify(v)).digest('hex');
 }
 
@@ -127,11 +121,11 @@ async function runTag(deps: Deps, manufacturerId: number, opts: { force?: boolea
   const cleaned = clean(m.markdown);
   const key = resultKey(manufacturerId, cleaned.text, v);
 
-  // Nothing below runs if this exact site text has already been tagged by this exact pipeline.
+  // Nothing below runs if this exact site text has already been tagged by this exact pipeline. A
+  // failed attempt is stored under its own key (step 10), so it is never served and always retried.
   if (!opts.force) {
     const row = deps.store.results.get(key);
-    // A stored error is a record of a failed attempt, not an answer: retry instead of serving it.
-    if (row && row.status !== 'error') return fromRow(row);
+    if (row) return fromRow(row);
   }
 
   // STEP 2: chunk (text/chunk.ts). Used twice below: as windows in step 3, as evidence in step 7.
@@ -153,19 +147,28 @@ async function runTag(deps: Deps, manufacturerId: number, opts: { force?: boolea
     error: null,
   };
 
+  // Every model call below goes through this client, which charges each billed attempt to the
+  // result the moment it is made: a run that fails halfway is still stored with what it cost.
+  const llm: LlmClient = {
+    complete: (req) =>
+      deps.llm.complete(req, (usage, costUsd) => {
+        const step = req.schemaName === 'judge' ? 'judge' : 'profile';
+        result.usage[step] = addUsage(result.usage[step], usage);
+        result.costUsd += costUsd;
+      }),
+  };
+
   try {
-    if (cleaned.text.length < MIN_CLEANED_CHARS) {
+    if (cleaned.text.length < config.minCleanedChars) {
       result.status = 'insufficient_content';
     } else {
       const tagStr = String(manufacturerId);
 
       // STEPS 3 and 5: read every window, merge into the card, verify its quotes (pipeline/profile.ts).
       // Model calls 1..n. Everything after this works from the card, not from the site text.
-      const p = await profile(deps.llm, chunks, tagStr);
+      const p = await profile(llm, chunks, tagStr);
       result.card = p.card;
       result.entityType = p.card.entity_type;
-      result.usage.profile = p.usage;
-      result.costUsd += p.costUsd; // charged as it is spent: a later failure must not zero the bill
       result.evidence.windows = p.windows;
       result.evidence.quotes = p.quotes;
 
@@ -178,9 +181,7 @@ async function runTag(deps: Deps, manufacturerId: number, opts: { force?: boolea
       result.evidence.judgeEvidenceChars = evidence.length;
 
       // STEPS 7 and 8: judge each candidate in batches, then validate every verdict in code.
-      const j = candidates.length ? await judge(deps.llm, p.card, evidence, candidates, tagStr) : { verdicts: [], batches: 0, unknownIds: 0, repeatedIds: 0, usage: ZERO_USAGE, costUsd: 0 };
-      result.usage.judge = j.usage;
-      result.costUsd += j.costUsd;
+      const j = await judge(llm, p.card, evidence, candidates, tagStr);
       result.evidence.batches = j.batches;
       result.evidence.unknownIds = j.unknownIds;
       result.evidence.repeatedIds = j.repeatedIds;
@@ -195,7 +196,10 @@ async function runTag(deps: Deps, manufacturerId: number, opts: { force?: boolea
     result.status = 'error';
     result.error = e instanceof Error ? `${e.constructor.name}: ${e.message}` : String(e);
   }
-  // STEP 10: one row, always - a failure is stored as `error` with what it cost, never dropped.
+  // STEP 10: one row, always - a failure is stored as `error` with what it cost, never dropped. It
+  // goes under its own key, so a forced re-run that fails cannot overwrite the answer already
+  // stored for this exact input, and results.current() still serves that answer.
+  if (result.status === 'error') result.key = `${key}:error`;
   result.usage.total = addUsage(result.usage.profile, result.usage.judge);
   result.durationMs = Date.now() - t0;
   deps.store.results.put(toRow(result));

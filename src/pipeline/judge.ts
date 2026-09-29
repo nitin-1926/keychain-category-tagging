@@ -1,8 +1,9 @@
 // STEPS 7 and 8 (ARCHITECTURE.md section 3): the judge decides, in batches that share one prefix,
 // then code validates what it said. Steps 7 and 8 live in one file because they are one loop: no
 // verdict leaves judge() without having been checked.
-// Called by: pipeline/tag.ts. Calls: llm/client.ts complete() once per batch, text/normalize.ts
-// for the quote guard. Next step: pipeline/policy.ts, on the verdicts this returns.
+// Called by: pipeline/tag.ts. Calls: llm/client.ts complete() once per batch (the client tag.ts
+// hands in records what each costs), text/normalize.ts for the quote guard. Next step:
+// pipeline/policy.ts, on the verdicts this returns.
 // Order below: the output schema, evidenceBlocks() (what the judge is shown), batches() (how it is
 // cut up), then judge() which runs the calls and applies the guards.
 
@@ -10,11 +11,10 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { config } from '../config.js';
 import type { LlmClient } from '../llm/client.js';
-import { addUsage, ZERO_USAGE, type Usage } from '../llm/pricing.js';
 import type { Chunk } from '../text/chunk.js';
-import { findQuote, normalize, type QuoteMatch } from '../text/normalize.js';
+import { normalize, quoteMatcher, type QuoteMatch } from '../text/normalize.js';
 import type { Card } from './profile.js';
-import type { Candidate, MatchedBy } from './shortlist.js';
+import { phrasesOf, type Candidate, type MatchedBy } from './shortlist.js';
 
 export const JudgeOutput = z.object({
   verdicts: z.array(
@@ -43,16 +43,16 @@ export type Verdict = {
   flags: string[]; // quote_not_found | missing_from_output
 };
 
-export type JudgeResult = { verdicts: Verdict[]; batches: number; unknownIds: number; repeatedIds: number; usage: Usage; costUsd: number };
+type JudgeResult = { verdicts: Verdict[]; batches: number; unknownIds: number; repeatedIds: number };
 
 export const JUDGE_PROMPT = readFileSync(new URL(`../prompts/judge.${config.prompts.judge}.md`, import.meta.url), 'utf8');
 
 // What the judge sees: the site head (entity context) plus every chunk a card quote was found in.
 // Bounded by the card size, not the site size, so a 190K-token site does not go into every batch.
-export function evidenceBlocks(card: Card, chunks: Chunk[], headChars = 2_000): string {
-  const quotes = [...card.products, ...card.capabilities].map((p) => normalize(p.quote)).filter(Boolean);
+export function evidenceBlocks(card: Card, chunks: Chunk[]): string {
+  const quotes = phrasesOf(card).map((p) => normalize(p.quote)).filter(Boolean);
   const keep = new Set<number>();
-  for (const c of chunks) if (c.charStart < headChars) keep.add(c.index);
+  for (const c of chunks) if (c.charStart < config.judgeHeadChars) keep.add(c.index);
   const norm = chunks.map((c) => normalize(c.text));
   // Deliberately stricter than the guard that admitted the quote in step 5: a plain substring,
   // no fuzzy tier. It means 12 of 1,235 card quotes (a fuzzy match, or a quote straddling a
@@ -89,15 +89,14 @@ export function batches(candidates: Candidate[], size = config.judgeBatchSize): 
 
 export async function judge(llm: LlmClient, card: Card, evidence: string, candidates: Candidate[], tag: string): Promise<JudgeResult> {
   const prefix = `CARD\n${JSON.stringify(card, null, 1)}\n\nEVIDENCE\n${evidence}\n\nCANDIDATES\n`;
-  let usage = ZERO_USAGE;
-  let costUsd = 0;
+  const findQuote = quoteMatcher(evidence);
   let unknownIds = 0;
   let repeatedIds = 0;
   const verdicts: Verdict[] = [];
   const batched = batches(candidates);
 
   for (const batch of batched) {
-    const list = batch.map((c) => ({ id: c.id, name: c.name, definition: (c.definition ?? '').slice(0, 300) }));
+    const list = batch.map((c) => ({ id: c.id, name: c.name, definition: (c.definition ?? '').slice(0, config.judgeDefinitionChars) }));
     const r = await llm.complete({
       model: config.MODEL_PIPELINE,
       promptVersion: config.prompts.judge,
@@ -110,8 +109,6 @@ export async function judge(llm: LlmClient, card: Card, evidence: string, candid
       maxOutputTokens: 200 + batch.length * 150,
       tag,
     });
-    usage = addUsage(usage, r.usage);
-    costUsd += r.costUsd;
 
     const inBatch = new Map(batch.map((c) => [c.id, c]));
     const seen = new Set<number>();
@@ -131,7 +128,7 @@ export async function judge(llm: LlmClient, card: Card, evidence: string, candid
       let { applies, quote, reason } = v;
       let quoteMatch: QuoteMatch | null = null;
       if (applies) {
-        quoteMatch = findQuote(quote ?? '', evidence);
+        quoteMatch = findQuote(quote ?? '');
         if (quoteMatch === 'none') {
           applies = false;
           flags.push('quote_not_found');
@@ -146,5 +143,5 @@ export async function judge(llm: LlmClient, card: Card, evidence: string, candid
       verdicts.push({ id: c.id, name: c.name, group: c.group, applies: false, confidence: 0, quote: null, reason: 'missing_from_output', quoteMatch: null, retrievalScore: c.score, matchedBy: c.matchedBy, phrases: c.phrases, flags: ['missing_from_output'] });
     }
   }
-  return { verdicts, batches: batched.length, unknownIds, repeatedIds, usage, costUsd };
+  return { verdicts, batches: batched.length, unknownIds, repeatedIds };
 }

@@ -11,6 +11,7 @@ import { currentPipelineRow, exportReplay, importReplay } from './llm/replay.js'
 import { profile } from './pipeline/profile.js';
 import { shortlist } from './pipeline/shortlist.js';
 import { tag, type TagResult } from './pipeline/tag.js';
+import { pool } from './pool.js';
 import { chunk } from './text/chunk.js';
 import { clean } from './text/clean.js';
 
@@ -24,13 +25,12 @@ import { clean } from './text/clean.js';
 const [cmd, ...args] = process.argv.slice(2);
 const src = openSource(config.SOURCE_DB);
 
-// One store per process, and the committed replay files are loaded into it before anything reads
-// it. Imported on every command, not only into an empty cache: a cache holding a few rows from an
-// earlier command is exactly the case where a replay miss would otherwise surprise a reviewer.
-let store: ReturnType<typeof openStore> | undefined;
+// The artifacts store, with the committed replay files loaded into it before anything reads it.
+// Every command opens it at most once. Imported on every command, not only into an empty cache: a
+// cache holding a few rows from an earlier command is exactly the case where a replay miss would
+// otherwise surprise a reviewer.
 function artifactStore() {
-  if (store) return store;
-  store = openStore(`${config.ARTIFACTS_DIR}/tagging.sqlite`);
+  const store = openStore(`${config.ARTIFACTS_DIR}/tagging.sqlite`);
   const replayDir = `${config.ARTIFACTS_DIR}/replay`;
   if (existsSync(replayDir)) console.error(`[replay] ${importReplay(store, replayDir)} cached responses loaded from ${replayDir}`);
   return store;
@@ -109,8 +109,9 @@ const commands: Record<string, (args: string[]) => Promise<void> | void> = {
     const llm = clientFromConfig(artifactStore());
     const chunks = chunk(clean(m.markdown).lines, config.chunkChars);
     const t0 = Date.now();
-    const r = await profile(llm, chunks, String(m.id));
-    console.log(`${m.domain}: ${r.windows} windows, ${r.evidence.length} chars, quotes ${JSON.stringify(r.quotes)}, usage ${JSON.stringify(r.usage)}, $${r.costUsd.toFixed(4)}, ${Date.now() - t0} ms`);
+    let cost = 0;
+    const r = await profile({ complete: (req) => llm.complete(req, (_, usd) => (cost += usd)) }, chunks, String(m.id));
+    console.log(`${m.domain}: ${r.windows} windows, quotes ${JSON.stringify(r.quotes)}, $${cost.toFixed(4)}, ${Date.now() - t0} ms`);
     console.log(`entity_type: ${r.card.entity_type} (${r.card.site_language})  ${r.card.summary}`);
     console.log(`brands: ${r.card.brands.join(', ')}`);
     for (const p of r.card.products) console.log(`  product     ${p.name}${p.storage ? ` [${p.storage}]` : ''}  <- "${p.quote.slice(0, 90)}"`);
@@ -121,8 +122,7 @@ const commands: Record<string, (args: string[]) => Promise<void> | void> = {
   async shortlist(args) {
     const m = src.getManufacturer(Number(args[0]))!;
     const mode = args[1] === '--mode' ? (args[2] as typeof config.QUERY_MODE) : config.QUERY_MODE;
-    const llm = clientFromConfig(artifactStore());
-    const index = await loadOrBuildIndex(src.listCategories(), src.taxonomyHash());
+    const { llm, index } = await deps();
     const { card } = await profile(llm, chunk(clean(m.markdown).lines, config.chunkChars), String(m.id));
     const out = await shortlist(card, index, { mode });
     console.log(`${m.domain}: ${card.products.length} products + ${card.capabilities.length} capabilities -> ${out.length} candidates (mode ${mode})`);
@@ -150,18 +150,22 @@ const commands: Record<string, (args: string[]) => Promise<void> | void> = {
     const ids = args.includes('--dev') ? devSet() : src.listManufacturerIds();
     const n = Number(args[args.indexOf('--concurrency') + 1]) || 1;
     const force = args.includes('--force');
-    let next = 0;
     let total = 0;
-    const worker = async () => {
-      for (let i = next++; i < ids.length; i = next++) {
-        const r = await tag(d, ids[i]!, { force });
+    let failed = 0;
+    // One manufacturer failing outside the pipeline (a store write, say) is reported and the run
+    // goes on: a batch of thousands must not end at its first bad row.
+    await pool(ids, n, async (id) => {
+      try {
+        const r = await tag(d, id, { force });
         total += r.costUsd;
         const m = src.getManufacturer(r.manufacturerId)!;
         console.log(`${r.manufacturerId}\t${m.domain.padEnd(32)}\t${r.status.padEnd(22)}\t${(r.entityType ?? '-').padEnd(12)}\t${String(r.accepted.length).padStart(3)} accepted\t$${r.costUsd.toFixed(4)}${r.cached ? '\t(stored)' : ''}${r.error ? `\t${r.error}` : ''}`);
+      } catch (e) {
+        failed++;
+        console.log(`${id}\tfailed\t${e instanceof Error ? e.message : String(e)}`);
       }
-    };
-    await Promise.all(Array.from({ length: n }, worker));
-    console.log(`total $${total.toFixed(4)} for ${ids.length} manufacturers`);
+    });
+    console.log(`total $${total.toFixed(4)} for ${ids.length} manufacturers${failed ? `, ${failed} failed` : ''}`);
   },
 
   // report: artifacts/report.md and calibration.json, stored results vs artifacts/reference.json
@@ -185,7 +189,7 @@ const commands: Record<string, (args: string[]) => Promise<void> | void> = {
   cache(args) {
     const store = artifactStore();
     const dir = args[1] ?? `${config.ARTIFACTS_DIR}/replay`;
-    if (args[0] === 'export') console.log(exportReplay(store, dir, currentPipelineRow).join('\n') || '(cache empty)');
+    if (args[0] === 'export') console.log(exportReplay(store, dir, currentPipelineRow).join('\n'));
     else if (args[0] === 'import') console.log(`${importReplay(store, dir)} rows imported`);
     else console.error('usage: cache export|import [dir]');
   },

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { openStore } from '../../src/db/store.js';
-import { createClient } from '../../src/llm/client.js';
 import { profile, PROFILE_PROMPT, REDUCE_PROMPT, verifyCard, windows, type Card } from '../../src/pipeline/profile.js';
 import { chunk } from '../../src/text/chunk.js';
+import { fakeLlm } from '../fake-llm.js';
 
 const evidence = 'We brew **“Cold-Brew”** coffee in cans. Our kombucha is refrigerated. We also make oat milk lattes.';
 const card = (products: Card['products'], entity_type: Card['entity_type'] = 'manufacturer'): Card => ({
@@ -44,36 +43,31 @@ describe('prompts', () => {
   });
 });
 
-describe('profile (stub)', () => {
+describe('profile (fake model)', () => {
   const lines = (n: number, text: string) => Array.from({ length: n }, (_, i) => `${text} ${i}`);
 
   it('single window: map once, no reduce', async () => {
-    const llm = createClient({ mode: 'stub', store: openStore(':memory:') });
-    let calls = 0;
-    llm.stub.on<Card>('card', () => {
-      calls++;
-      return card([{ name: 'Cold brew coffee', quote: 'Cold-Brew', storage: null }]);
-    });
+    const { llm, calls } = fakeLlm({ card: () => card([{ name: 'Cold brew coffee', quote: 'Cold-Brew', storage: null }]) });
     const r = await profile(llm, chunk([evidence]), 't');
     expect(r.windows).toBe(1);
-    expect(calls).toBe(1);
+    expect(calls()).toBe(1);
     expect(r.card.products).toHaveLength(1);
-    expect(r.evidence).toBe(evidence);
   });
 
   it('three windows: map three times, reduce once, duplicates merged', async () => {
-    const llm = createClient({ mode: 'stub', store: openStore(':memory:') });
     const seen: string[] = [];
-    llm.stub.on<Card>('card', (req) => {
-      seen.push(req.system === REDUCE_PROMPT ? 'reduce' : 'map');
-      if (req.system === REDUCE_PROMPT) {
-        return card([
-          { name: 'Snack bar', quote: 'snack bar 0', storage: null },
-          { name: 'Snack Bar', quote: 'snack bar 1', storage: null },
-        ]);
-      }
-      const i = Number(/Window (\d+)/.exec(req.user)![1]);
-      return card([{ name: 'Snack bar', quote: `snack bar ${i}`, storage: null }]);
+    const { llm } = fakeLlm({
+      card: (req) => {
+        seen.push(req.system === REDUCE_PROMPT ? 'reduce' : 'map');
+        if (req.system === REDUCE_PROMPT) {
+          return card([
+            { name: 'Snack bar', quote: 'snack bar 0', storage: null },
+            { name: 'Snack Bar', quote: 'snack bar 1', storage: null },
+          ]);
+        }
+        const i = Number(/Window (\d+)/.exec(req.user)![1]);
+        return card([{ name: 'Snack bar', quote: `snack bar ${i}`, storage: null }]);
+      },
     });
     const chunks = chunk(lines(30, 'snack bar'.padEnd(200, '.')), 1_000);
     const r = await profile(llm, chunks, 't', { windowChars: 2_500 });
