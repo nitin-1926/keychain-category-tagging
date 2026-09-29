@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -30,6 +30,17 @@ describe('store + replay', () => {
     const dir2 = mkdtempSync(join(tmpdir(), 'kct-replay-'));
     exportReplay(b, dir2);
     expect(readFileSync(join(dir2, '402.json'), 'utf8')).toBe(readFileSync(join(dir, '402.json'), 'utf8'));
+  });
+
+  // `cache export .` used to delete package.json and tsconfig.json; `cache export artifacts`,
+  // reference.json. Only files shaped like replay files are this command's to remove.
+  it('export removes stale replay files and nothing else in the directory', () => {
+    const a = openStore(':memory:');
+    a.cache.put(row('k1', '402'));
+    const dir = mkdtempSync(join(tmpdir(), 'kct-replay-'));
+    for (const f of ['package.json', 'reference.json', '999.json', 'untagged.json']) writeFileSync(join(dir, f), '{}');
+    exportReplay(a, dir);
+    expect(readdirSync(dir).sort()).toEqual(['402.json', 'package.json', 'reference.json']);
   });
 
   it('an export that would keep nothing refuses instead of emptying the committed evidence', () => {

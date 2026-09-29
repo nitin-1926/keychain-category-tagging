@@ -20,10 +20,15 @@ export function currentPipelineRow(row: CacheRow): boolean {
 
 // artifacts/replay/<tag>.json: the committed evidence + responses so the pipeline reruns without a key.
 // Rows are written sorted and pretty-printed so a re-export of the same cache is byte-identical.
-// The rows are grouped before anything is deleted, and only the .json files this export replaces
-// are removed: an empty or filtered-out cache must never take the committed evidence with it.
+// The rows are grouped before anything is deleted, so an empty or filtered-out cache never takes the
+// committed evidence with it. Only files named like replay files are removed (a stale manufacturer's
+// file goes, a rewritten one is replaced): any other .json in the directory is not this command's
+// to delete, so `cache export .` or `cache export artifacts` cannot take package.json or
+// reference.json with it (AI_LOG entry 18).
+const REPLAY_FILE = /^(\d+|untagged)\.json$/;
 
 export function exportReplay(store: Store, dir: string, keep: (row: CacheRow) => boolean = () => true): string[] {
+  // Filtered while streaming: the whole cache is ~90 MB, the rows this export keeps a fraction of it.
   const groups = new Map<string, CacheRow[]>();
   for (const row of store.cache.rows()) {
     if (!keep(row)) continue;
@@ -32,7 +37,7 @@ export function exportReplay(store: Store, dir: string, keep: (row: CacheRow) =>
   }
   if (!groups.size) throw new Error(`nothing to export: no cache row matches the current pipeline, refusing to empty ${dir}`);
   mkdirSync(dir, { recursive: true });
-  for (const f of readdirSync(dir)) if (f.endsWith('.json')) rmSync(join(dir, f));
+  for (const f of readdirSync(dir)) if (REPLAY_FILE.test(f)) rmSync(join(dir, f));
   const files: string[] = [];
   for (const [tag, rows] of groups) {
     const file = join(dir, `${tag}.json`);
