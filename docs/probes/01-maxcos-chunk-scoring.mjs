@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { pipeline, env } from '@huggingface/transformers';
 env.cacheDir = './.model-cache';
 
-const db = new DatabaseSync('/Users/nitingupta/Desktop/Personal/Projects/keychain-category-tagging/data/category_tagging.sqlite', { readOnly: true });
+const db = new DatabaseSync('data/category_tagging.sqlite', { readOnly: true });
 const cats = db.prepare('select id, name, definition from category').all();
 const t0 = Date.now();
 const ex = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small', { dtype: 'q8' });

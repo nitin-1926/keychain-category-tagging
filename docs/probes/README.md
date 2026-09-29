@@ -1,6 +1,6 @@
 # Design probes
 
-Small scripts run against the real dataset before the plan was finalised, to test the riskiest design assumption with data instead of argument. Each `.out` is the unedited output. Run with `node --no-warnings <file>.mjs` from a folder where `@huggingface/transformers` is installed (model download ~118 MB on first run).
+Small scripts run against the real dataset before the plan was finalised, to test the riskiest design assumption with data instead of argument. Each `.out` is the unedited output. Run from the repo root with `node --no-warnings docs/probes/<file>.mjs` (model download ~118 MB on first run).
 
 | Probe | Question | Result |
 |---|---|---|
